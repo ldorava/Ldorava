@@ -6,6 +6,36 @@
 <title>المتجر</title>
 <link rel="stylesheet" href="style.css">
 </head>
+  <button id="installAppBtn" style="display: none;">تثبيت التطبيق</button>
+
+<script>
+  let deferredPrompt;
+  const installBtn = document.getElementById('installAppBtn');
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js');
+    });
+  }
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    if (installBtn) {
+      installBtn.style.display = 'inline-block';
+    }
+  });
+
+  if (installBtn) {
+    installBtn.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      installBtn.style.display = 'none';
+    });
+  }
+</script>
 <body>
 <header class="top">
   <div class="logo" id="shopName">المتجر</div>
