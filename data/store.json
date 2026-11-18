@@ -1,44 +1,109 @@
 {
-  "settings": { "name": "متجر الجمال", "currency": "د.ع", "whatsapp": "" },
+  "settings": {
+    "name": "Ldorava",
+    "currency": "د.ع",
+    "whatsapp": "07715495213"
+  },
   "categories": [
-    { "id": "skincare", "name": "العناية بالبشرة", "icon": "🧴" },
-    { "id": "makeup", "name": "المكياج", "icon": "💄" },
-    { "id": "perfume", "name": "العطور", "icon": "🌸" },
-    { "id": "hair", "name": "العناية بالشعر", "icon": "💆‍♀️" }
+    {
+      "id": "skincare",
+      "name": "العناية بالبشرة",
+      "icon": "🧴"
+    },
+    {
+      "id": "makeup",
+      "name": "المكياج",
+      "icon": "💄"
+    },
+    {
+      "id": "perfume",
+      "name": "العطور",
+      "icon": "🌸"
+    },
+    {
+      "id": "hair",
+      "name": "العناية بالشعر",
+      "icon": "💆‍♀️"
+    }
   ],
   "products": [
     {
-      "id": "p1", "name": "شامبو", "category": "hair",
+      "id": "p1",
+      "name": "شامبو",
+      "category": "hair",
       "description": "شامبو بتركيبة لطيفة للاستخدام اليومي.",
-      "image": "", "price": 0,
+      "image": "",
+      "price": 0,
       "variants": [
-        { "name": "للشعر الدهني", "price": 9000, "inStock": true },
-        { "name": "للشعر الجاف", "price": 9500, "inStock": true },
-        { "name": "ضد القشرة", "price": 11000, "inStock": true }
+        {
+          "name": "للشعر الدهني",
+          "price": 9000,
+          "inStock": true
+        },
+        {
+          "name": "للشعر الجاف",
+          "price": 9500,
+          "inStock": true
+        },
+        {
+          "name": "ضد القشرة",
+          "price": 11000,
+          "inStock": true
+        }
       ]
     },
     {
-      "id": "p2", "name": "كريم مرطب للوجه", "category": "skincare",
+      "id": "p2",
+      "name": "كريم مرطب للوجه",
+      "category": "skincare",
       "description": "ترطيب عميق لمدة 24 ساعة.",
-      "image": "", "price": 15000, "variants": []
+      "image": "",
+      "price": 15000,
+      "variants": []
     },
     {
-      "id": "p3", "name": "أحمر شفاه مطفي", "category": "makeup",
+      "id": "p3",
+      "name": "أحمر شفاه مطفي",
+      "category": "makeup",
       "description": "ثبات عالٍ وألوان متعددة.",
-      "image": "", "price": 0,
+      "image": "",
+      "price": 0,
       "variants": [
-        { "name": "وردي", "price": 8000, "inStock": true },
-        { "name": "أحمر", "price": 8000, "inStock": true },
-        { "name": "نude", "price": 8000, "inStock": true }
+        {
+          "name": "وردي",
+          "price": 8000,
+          "inStock": true
+        },
+        {
+          "name": "أحمر",
+          "price": 8000,
+          "inStock": true
+        },
+        {
+          "name": "نude",
+          "price": 8000,
+          "inStock": true
+        }
       ]
     },
     {
-      "id": "p4", "name": "عطر زهري", "category": "perfume",
+      "id": "p4",
+      "name": "عطر زهري",
+      "category": "perfume",
       "description": "عطر نسائي بنفحات الورد والمسك.",
-      "image": "", "price": 0,
+      "image": "",
+      "price": 0,
       "variants": [
-        { "name": "50 مل", "price": 35000, "inStock": true },
-        { "name": "100 مل", "price": 60000, "inStock": true }
+        {
+          "name": "50 مل",
+          "price": 35000,
+          "inStock": true
+        },
+        {
+          "name": "100 مل",
+          "price": 60000,
+          "inStock": true
+        }
       ]
     }
   ]
