@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>المتجر</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="logo" id="shopName">المتجر</div>
+  <div class="search"><input id="search" type="search" placeholder="ابحثي عن منتج..."></div>
+  <button class="iconbtn" id="cartBtn">🛒 السلة <span class="badge" id="cartCount">0</span></button>
+</header>
+<nav class="cats" id="nav"></nav>
+<main><div class="grid" id="grid"></div></main>
+<footer>© <span id="yr"></span> — <a href="admin.html">لوحة الإدارة</a></footer>
+
+<div class="overlay" id="pov"><div class="modal" id="pmodal"></div></div>
+<div class="overlay" id="cov"></div>
+<aside class="drawer" id="drawer">
+  <div class="hd"><span>سلة التسوق</span><button class="btn sec sm" id="closeCart">إغلاق</button></div>
+  <div class="bd" id="cartBody"></div>
+  <div class="ft" id="cartFoot"></div>
+</aside>
+<script src="app.js"></script>
+</body>
+</html>
