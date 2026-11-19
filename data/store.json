@@ -31,27 +31,39 @@
       "id": "p1",
       "name": "شامبو",
       "category": "hair",
-      "description": "شامبو بتركيبة لطيفة للاستخدام اليومي.",
+      "description": "ﺷﺎمو ﻟﻴﺪورا ﻫﺮﺑﺎل ﺑﺎﻷﻋﺸﺎب 300مل",
       "image": "",
       "price": 0,
       "variants": [
         {
-          "name": "للشعر الدهني",
-          "price": 9000,
+          "name": "ﻟﻠﺸﻌﺮ اﻟﺠﺎف و اﻟﺘﺎﻟﻒ",
+          "price": 0,
           "inStock": true,
-          "image": "images/1795096798418.jpg"
+          "image": ""
         },
         {
-          "name": "للشعر الجاف",
-          "price": 9500,
+          "name": "ﻟﻠﺸﻌﺮ اﻟﻌﺎدي 300ﻣﻞ",
+          "price": 0,
           "inStock": true,
-          "image": "images/1795096803708.jpg"
+          "image": "images/1795097400500.jpg"
         },
         {
-          "name": "ضد القشرة",
-          "price": 11000,
+          "name": "ﺷﺎمبو اﻟﺠﺴﻢ 300lg",
+          "price": 0,
           "inStock": true,
-          "image": "images/1795096809811.jpg"
+          "image": ""
+        },
+        {
+          "name": "ﻟﻠﺸﻌﺮ اﻟﺪﻫﻨي 300ﻣﻞ",
+          "price": 0,
+          "inStock": true,
+          "image": ""
+        },
+        {
+          "name": "اليومي ﻟﻠﺸﻌﺮ 200 ﻣﯿﻞ",
+          "price": 0,
+          "inStock": true,
+          "image": ""
         }
       ]
     },
