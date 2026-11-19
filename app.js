@@ -59,6 +59,14 @@ function renderGrid() {
 
 $('#search').oninput = e => { q = e.target.value.trim(); renderGrid(); };
 
+function openConsultWhatsApp(p, activeVariant) {
+  const num = (D.settings.whatsapp || '').replace(/\D/g, '');
+  if (!num) { alert('لم يتم ضبط رقم واتساب في لوحة الإدارة'); return; }
+  const variantLine = activeVariant ? `\nالنوع: ${activeVariant.name}` : '';
+  const msg = `مرحباً، أود الحصول على استشارة مجانية بخصوص المنتج:\nالمنتج: ${p.name}${variantLine}`;
+  window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
 function openProduct(id) {
   const p = D.products.find(x => x.id === id); if (!p) return;
   let sel = hasVariants(p) ? p.variants.findIndex(v => v.inStock !== false) : -1;
@@ -114,7 +122,10 @@ function openProduct(id) {
         <div style="font-size:1.3rem;color:var(--pink);font-weight:700">${fmt(price)} ${esc(D.settings.currency || '')}</div>
         <div class="qty"><button id="qm">−</button><span>${qty}</span><button id="qp">+</button></div>
       </div>
-      <button class="btn" id="add" style="width:100%;margin-top:14px" ${sel < 0 && hasVariants(p) ? 'disabled' : ''}>أضيفي إلى السلة</button>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
+        <button class="btn" id="add" style="width:100%" ${sel < 0 && hasVariants(p) ? 'disabled' : ''}>أضيفي إلى السلة</button>
+        <button type="button" class="btn sec" id="consult" style="width:100%;background:#e8f8ee;color:#157347;border:1px solid #b7e4c7">💬 استشارة مجانية عبر واتساب</button>
+      </div>
       ${bottomInfoHtml}`;
 
     $('#px').onclick = () => $('#pov').classList.remove('show');
@@ -126,6 +137,7 @@ function openProduct(id) {
     });
     $('#qm').onclick = () => { qty = Math.max(1, qty - 1); draw(); };
     $('#qp').onclick = () => { qty++; draw(); };
+    $('#consult').onclick = () => openConsultWhatsApp(p, activeVariant);
     $('#add').onclick = () => {
       const v = activeVariant ? activeVariant.name : '';
       const ex = cart.find(c => c.pid === p.id && c.v === v);
