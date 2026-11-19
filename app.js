@@ -93,7 +93,7 @@ function openProduct(id) {
       ${hasVariants(p) ? `<div><b>اختاري النوع:</b></div><div class="chips">${p.variants.map((v, i) => `
         <span class="chip ${i === sel ? 'on' : ''} ${v.inStock === false ? 'off' : ''}" data-i="${i}">
           ${v.image ? `<img src="${esc(v.image)}" alt="${esc(v.name)}" style="width:20px;height:20px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-left:4px">` : ''}
-          ${esc(v.name)} — ${fmt(v.price)}
+          ${esc(v.name)}
         </span>`).join('')}</div>` : ''}
       <div class="row" style="justify-content:space-between">
         <div style="font-size:1.3rem;color:var(--pink);font-weight:700">${fmt(price)} ${esc(D.settings.currency || '')}</div>
