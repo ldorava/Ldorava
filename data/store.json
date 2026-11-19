@@ -38,17 +38,20 @@
         {
           "name": "للشعر الدهني",
           "price": 9000,
-          "inStock": true
+          "inStock": true,
+          "image": "images/1795096798418.jpg"
         },
         {
           "name": "للشعر الجاف",
           "price": 9500,
-          "inStock": true
+          "inStock": true,
+          "image": "images/1795096803708.jpg"
         },
         {
           "name": "ضد القشرة",
           "price": 11000,
-          "inStock": true
+          "inStock": true,
+          "image": "images/1795096809811.jpg"
         }
       ]
     },
