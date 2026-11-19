@@ -235,8 +235,9 @@ function editProduct(id) {
   if (!D.categories.length) { toast('أضيفي قسماً أولاً من تبويب الأقسام'); return; }
   const isNew = !id;
   const p = isNew
-    ? { id: uid('p'), name: '', category: D.categories[0].id, description: '', image: '', price: 0, variants: [] }
+    ? { id: uid('p'), name: '', category: D.categories[0].id, description: '', details: '', image: '', price: 0, variants: [] }
     : JSON.parse(JSON.stringify(D.products.find(x => x.id === id)));
+  p.details = p.details || '';
   p.variants = (p.variants || []).map(v => ({ ...v, image: v.image || '', description: v.description || '' }));
 
   const md = $('#md');
@@ -250,6 +251,7 @@ function editProduct(id) {
     p.name = $('#fn').value;
     p.category = $('#fc').value;
     p.description = $('#fd').value;
+    p.details = $('#fdt').value;
     p.price = +$('#fp').value || 0;
     md.querySelectorAll('[data-vn]').forEach(i => { if (p.variants[+i.dataset.vn]) p.variants[+i.dataset.vn].name = i.value; });
     md.querySelectorAll('[data-vp]').forEach(i => { if (p.variants[+i.dataset.vp]) p.variants[+i.dataset.vp].price = +i.value || 0; });
@@ -278,7 +280,7 @@ function editProduct(id) {
         `<option value="${esc(c.id)}" ${c.id === p.category ? 'selected' : ''}>${esc(c.icon || '')} ${esc(c.name)}</option>`).join('')}</select>
 
       <label for="fd">وصف المنتج العام (اختياري)</label>
-      <textarea id="fd" rows="3" style="width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid rgba(0,0,0,.15)" placeholder="وصف عام للمنتج...">${esc(p.description || '')}</textarea>
+      <textarea id="fd" rows="2" style="width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid rgba(0,0,0,.15)" placeholder="وصف مختصر للمنتج...">${esc(p.description || '')}</textarea>
 
       <label>الصورة العامة للمنتج (اختياري)</label>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
@@ -317,6 +319,9 @@ function editProduct(id) {
 
       <button type="button" class="btn sec sm" id="va" style="margin-top:12px">+ إضافة نوع</button>
 
+      <label for="fdt" style="margin-top:16px">الوصف الكامل للمنتج ومكوناته وطريقة الاستخدام (يظهر في أسفل صفحة المنتج)</label>
+      <textarea id="fdt" rows="5" style="width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid rgba(0,0,0,.15)" placeholder="مثال:&#10;الوصف الكامل: ...&#10;المكونات: ...&#10;طريقة الاستخدام: ...">${esc(p.details || '')}</textarea>
+
       <div class="row" style="margin-top:20px">
         <button type="button" class="btn" id="fs">موافق</button>
         <button type="button" class="btn sec" id="fcn">إلغاء</button>
@@ -353,6 +358,7 @@ function editProduct(id) {
       sync();
       p.name = p.name.trim();
       p.description = (p.description || '').trim();
+      p.details = (p.details || '').trim();
       if (!p.name) { toast('اكتبي اسم المنتج'); return; }
       p.variants = p.variants
         .filter(v => v.name.trim())
