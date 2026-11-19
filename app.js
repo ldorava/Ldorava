@@ -69,6 +69,15 @@ function openProduct(id) {
   const draw = () => {
     const activeVariant = hasVariants(p) && sel >= 0 ? p.variants[sel] : null;
     const price = activeVariant ? (activeVariant.price || 0) : p.price;
+    const variantImgHtml = activeVariant?.image
+      ? `<div class="v-preview" style="margin:10px 0;padding:8px;border:1px solid rgba(0,0,0,.08);border-radius:12px;background:#fff;display:flex;align-items:center;gap:10px">
+           <img src="${esc(activeVariant.image)}" alt="${esc(activeVariant.name)}" style="width:68px;height:68px;object-fit:cover;border-radius:10px;flex-shrink:0">
+           <div style="font-size:13px;line-height:1.5">
+             <div style="font-weight:700">${esc(activeVariant.name)}</div>
+             <div style="color:var(--muted)">صورة النوع المختار</div>
+           </div>
+         </div>`
+      : '';
 
     $('#pmodal').innerHTML = `
       <button class="x" id="px">×</button>
@@ -76,6 +85,7 @@ function openProduct(id) {
       <h2 style="margin:0">${esc(p.name)}</h2>
       <div class="tag" style="color:var(--muted)">${esc(catOf(p)?.name || '')}</div>
       <p>${esc(p.description || '')}</p>
+      ${variantImgHtml}
       ${hasVariants(p) ? `<div><b>اختاري النوع:</b></div><div class="chips">${p.variants.map((v, i) => `
         <span class="chip ${i === sel ? 'on' : ''} ${v.inStock === false ? 'off' : ''}" data-i="${i}">
           ${v.image ? `<img src="${esc(v.image)}" alt="${esc(v.name)}" style="width:20px;height:20px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-left:4px">` : ''}
