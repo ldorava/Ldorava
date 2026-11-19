@@ -235,10 +235,17 @@ function editProduct(id) {
   if (!D.categories.length) { toast('أضيفي قسماً أولاً من تبويب الأقسام'); return; }
   const isNew = !id;
   const p = isNew
-    ? { id: uid('p'), name: '', category: D.categories[0].id, description: '', details: '', image: '', price: 0, variants: [] }
+    ? { id: uid('p'), name: '', category: D.categories[0].id, description: '', specs: '', usage: '', image: '', price: 0, variants: [] }
     : JSON.parse(JSON.stringify(D.products.find(x => x.id === id)));
-  p.details = p.details || '';
-  p.variants = (p.variants || []).map(v => ({ ...v, image: v.image || '', description: v.description || '' }));
+  p.specs = p.specs || '';
+  p.usage = p.usage || '';
+  p.variants = (p.variants || []).map(v => ({
+    ...v,
+    image: v.image || '',
+    description: v.description || '',
+    specs: v.specs || '',
+    usage: v.usage || ''
+  }));
 
   const md = $('#md');
   md.style.maxWidth = '680px';
@@ -251,11 +258,14 @@ function editProduct(id) {
     p.name = $('#fn').value;
     p.category = $('#fc').value;
     p.description = $('#fd').value;
-    p.details = $('#fdt').value;
+    p.specs = $('#fsp').value;
+    p.usage = $('#fus').value;
     p.price = +$('#fp').value || 0;
     md.querySelectorAll('[data-vn]').forEach(i => { if (p.variants[+i.dataset.vn]) p.variants[+i.dataset.vn].name = i.value; });
     md.querySelectorAll('[data-vp]').forEach(i => { if (p.variants[+i.dataset.vp]) p.variants[+i.dataset.vp].price = +i.value || 0; });
     md.querySelectorAll('[data-vdsc]').forEach(i => { if (p.variants[+i.dataset.vdsc]) p.variants[+i.dataset.vdsc].description = i.value; });
+    md.querySelectorAll('[data-vsp]').forEach(i => { if (p.variants[+i.dataset.vsp]) p.variants[+i.dataset.vsp].specs = i.value; });
+    md.querySelectorAll('[data-vus]').forEach(i => { if (p.variants[+i.dataset.vus]) p.variants[+i.dataset.vus].usage = i.value; });
     md.querySelectorAll('[data-vs]').forEach(i => { if (p.variants[+i.dataset.vs]) p.variants[+i.dataset.vs].inStock = i.checked; });
   };
 
@@ -292,7 +302,7 @@ function editProduct(id) {
       <label for="fp">السعر (يُستخدم إذا لم تكن هناك أنواع)</label>
       <input type="number" id="fp" min="0" value="${p.price || 0}">
 
-      <label style="margin-top:14px">الأنواع (لكل نوع اسم، سعر، وصف خاص به، وصورة)</label>
+      <label style="margin-top:14px">الأنواع (لكل نوع اسم، سعر، وصف، مواصفات، طريقة استعمال، وصورة)</label>
       <div id="vs" style="display:flex;flex-direction:column;gap:12px;margin-top:8px">
         ${p.variants.map((v, i) => {
           const vSrc = v.image ? (previews[v.image] || v.image) : '';
@@ -302,7 +312,9 @@ function editProduct(id) {
               <input type="text" data-vn="${i}" value="${esc(v.name)}" placeholder="اسم النوع" style="flex:1;min-width:150px">
               <input type="number" data-vp="${i}" min="0" value="${v.price || 0}" placeholder="السعر" style="width:110px">
             </div>
-            <input type="text" data-vdsc="${i}" value="${esc(v.description || '')}" placeholder="وصف هذا النوع (يظهر عند اختياره)..." style="width:100%;box-sizing:border-box">
+            <input type="text" data-vdsc="${i}" value="${esc(v.description || '')}" placeholder="وصف مختصر لهذا النوع..." style="width:100%;box-sizing:border-box">
+            <textarea data-vsp="${i}" rows="2" placeholder="المواصفات الخاصة بهذا النوع..." style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.15)">${esc(v.specs || '')}</textarea>
+            <textarea data-vus="${i}" rows="2" placeholder="طريقة الاستعمال الخاصة بهذا النوع..." style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.15)">${esc(v.usage || '')}</textarea>
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding-top:6px;border-top:1px dashed rgba(0,0,0,.08)">
               <label style="margin:0;display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
                 <input type="checkbox" data-vs="${i}" ${v.inStock !== false ? 'checked' : ''}> متوفر
@@ -319,8 +331,11 @@ function editProduct(id) {
 
       <button type="button" class="btn sec sm" id="va" style="margin-top:12px">+ إضافة نوع</button>
 
-      <label for="fdt" style="margin-top:16px">الوصف الكامل للمنتج ومكوناته وطريقة الاستخدام (يظهر في أسفل صفحة المنتج)</label>
-      <textarea id="fdt" rows="5" style="width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid rgba(0,0,0,.15)" placeholder="مثال:&#10;الوصف الكامل: ...&#10;المكونات: ...&#10;طريقة الاستخدام: ...">${esc(p.details || '')}</textarea>
+      <label for="fsp" style="margin-top:16px">المواصفات العامة للمنتج (تظهر في الأسفل إذا لم يحدد للنوع)</label>
+      <textarea id="fsp" rows="3" style="width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid rgba(0,0,0,.15)" placeholder="مثال: الحجم 300 مل، مناسب للشعر العادي، خالٍ من السلفات...">${esc(p.specs || '')}</textarea>
+
+      <label for="fus" style="margin-top:12px">طريقة الاستعمال العامة للمنتج (تظهر في الأسفل إذا لم يحدد للنوع)</label>
+      <textarea id="fus" rows="3" style="width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid rgba(0,0,0,.15)" placeholder="مثال: يُوضع على شعر مبلل ويُدلّك بلطف ثم يُشطف بالماء...">${esc(p.usage || '')}</textarea>
 
       <div class="row" style="margin-top:20px">
         <button type="button" class="btn" id="fs">موافق</button>
@@ -328,7 +343,7 @@ function editProduct(id) {
       </div>`;
 
     $('#mx').onclick = $('#fcn').onclick = closeModal;
-    $('#va').onclick = () => { sync(); p.variants.push({ name: '', price: p.price || 0, description: '', inStock: true, image: '' }); draw(); };
+    $('#va').onclick = () => { sync(); p.variants.push({ name: '', price: p.price || 0, description: '', specs: '', usage: '', inStock: true, image: '' }); draw(); };
     md.querySelectorAll('[data-vd]').forEach(b => b.onclick = () => { sync(); p.variants.splice(+b.dataset.vd, 1); draw(); });
     md.querySelectorAll('[data-vr]').forEach(b => b.onclick = () => { sync(); p.variants[+b.dataset.vr].image = ''; draw(); });
     md.querySelectorAll('[data-vf]').forEach(inp => {
@@ -358,7 +373,8 @@ function editProduct(id) {
       sync();
       p.name = p.name.trim();
       p.description = (p.description || '').trim();
-      p.details = (p.details || '').trim();
+      p.specs = (p.specs || '').trim();
+      p.usage = (p.usage || '').trim();
       if (!p.name) { toast('اكتبي اسم المنتج'); return; }
       p.variants = p.variants
         .filter(v => v.name.trim())
@@ -366,6 +382,8 @@ function editProduct(id) {
           name: v.name.trim(),
           price: +v.price || 0,
           description: (v.description || '').trim(),
+          specs: (v.specs || '').trim(),
+          usage: (v.usage || '').trim(),
           inStock: v.inStock !== false,
           image: v.image || ''
         }));
