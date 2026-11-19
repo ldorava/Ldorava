@@ -212,7 +212,10 @@ function editProduct(id) {
 
   const sync = () => {
     if (!$('#fn')) return;
-    p.name = $('#fn').value; p.category = $('#fc').value; p.description = $('#fd').value; p.price = +$('#fp').value || 0;
+    p.name = $('#fn').value;
+    p.category = $('#fc').value;
+    p.description = $('#fd').value;
+    p.price = +$('#fp').value || 0;
     $('#md').querySelectorAll('[data-vn]').forEach(i => { if (p.variants[+i.dataset.vn]) p.variants[+i.dataset.vn].name = i.value; });
     $('#md').querySelectorAll('[data-vp]').forEach(i => { if (p.variants[+i.dataset.vp]) p.variants[+i.dataset.vp].price = +i.value || 0; });
     $('#md').querySelectorAll('[data-vs]').forEach(i => { if (p.variants[+i.dataset.vs]) p.variants[+i.dataset.vs].inStock = i.checked; });
@@ -231,15 +234,15 @@ function editProduct(id) {
     $('#md').innerHTML = `<button class="x" id="mx">×</button>
       <h2 style="margin-top:0;color:var(--pink)">${isNew ? 'منتج جديد' : 'تعديل المنتج'}</h2>
 
-      <label>اسم المنتج</label>
+      <label for="fn">اسم المنتج</label>
       <input type="text" id="fn" value="${esc(p.name)}" placeholder="مثال: شامبو">
 
-      <label>القسم</label>
+      <label for="fc">القسم</label>
       <select id="fc">${D.categories.map(c =>
         `<option value="${esc(c.id)}" ${c.id === p.category ? 'selected' : ''}>${esc(c.icon || '')} ${esc(c.name)}</option>`).join('')}</select>
 
-      <label>الوصف</label>
-      <textarea id="fd">${esc(p.description)}</textarea>
+      <label for="fd">الوصف</label>
+      <textarea id="fd" rows="3" placeholder="اكتبي وصف المنتج ومواصفاته هنا...">${esc(p.description || '')}</textarea>
 
       <label>الصورة العامة للمنتج (اختياري)</label>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
@@ -248,11 +251,11 @@ function editProduct(id) {
         ${p.image ? '<button type="button" class="btn danger sm" id="fr">إزالة</button>' : ''}
       </div>
 
-      <label>السعر (يُستخدم إذا لم تكن هناك أنواع)</label>
+      <label for="fp">السعر (يُستخدم إذا لم تكن هناك أنواع)</label>
       <input type="number" id="fp" min="0" value="${p.price || 0}">
 
       <label style="margin-top:12px">الأنواع (اختياري — لكل نوع اسم، سعر، وصورة خاصة به)</label>
-      <div id="vs" style="display:flex;flex-direction:column;gap:10px;margin-top:6px">
+      <div id="vs" style="display:flex;flex-direction:column;gap:10px;margin-top:6px;max-height:260px;overflow-y:auto;padding-left:4px">
         ${p.variants.map((v, i) => {
           const vSrc = v.image ? (previews[v.image] || v.image) : '';
           return `<div style="border:1px solid rgba(0,0,0,.1);border-radius:12px;padding:10px;background:#fff;display:flex;flex-direction:column;gap:8px">
@@ -312,6 +315,7 @@ function editProduct(id) {
     $('#fs').onclick = () => {
       sync();
       p.name = p.name.trim();
+      p.description = (p.description || '').trim();
       if (!p.name) { toast('اكتبي اسم المنتج'); return; }
       p.variants = p.variants
         .filter(v => v.name.trim())
