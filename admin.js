@@ -129,7 +129,9 @@ function viewProducts() {
       `<option value="${esc(c.id)}" ${c.id === filterCat ? 'selected' : ''}>${esc(c.icon || '')} ${esc(c.name)}</option>`).join('')}</select>
     <div class="list" style="margin-top:8px">${list.length ? list.map(p => {
       const c = D.categories.find(x => x.id === p.category);
-      const th = p.image ? `<img src="${esc(previews[p.image] || p.image)}" alt="">` : (c?.icon || '🛍️');
+      const varImg = hasVar(p) ? p.variants.find(v => v.image)?.image : '';
+      const imgSrc = p.image || varImg || '';
+      const th = imgSrc ? `<img src="${esc(previews[imgSrc] || imgSrc)}" alt="">` : (c?.icon || '🛍️');
       return `<div class="it"><div class="th">${th}</div>
         <div class="n">${esc(p.name)}<small>${esc(c?.name || 'بدون قسم')} · ${priceText(p)} ${esc(D.settings.currency || '')}</small></div>
         <button class="btn sec sm" data-e="${esc(p.id)}">تعديل</button>
@@ -206,14 +208,14 @@ function editProduct(id) {
   const p = isNew
     ? { id: uid('p'), name: '', category: D.categories[0].id, description: '', image: '', price: 0, variants: [] }
     : JSON.parse(JSON.stringify(D.products.find(x => x.id === id)));
-  p.variants = p.variants || [];
+  p.variants = (p.variants || []).map(v => ({ ...v, image: v.image || '' }));
 
   const sync = () => {
     if (!$('#fn')) return;
     p.name = $('#fn').value; p.category = $('#fc').value; p.description = $('#fd').value; p.price = +$('#fp').value || 0;
-    $('#md').querySelectorAll('[data-vn]').forEach(i => p.variants[+i.dataset.vn].name = i.value);
-    $('#md').querySelectorAll('[data-vp]').forEach(i => p.variants[+i.dataset.vp].price = +i.value || 0);
-    $('#md').querySelectorAll('[data-vs]').forEach(i => p.variants[+i.dataset.vs].inStock = i.checked);
+    $('#md').querySelectorAll('[data-vn]').forEach(i => { if (p.variants[+i.dataset.vn]) p.variants[+i.dataset.vn].name = i.value; });
+    $('#md').querySelectorAll('[data-vp]').forEach(i => { if (p.variants[+i.dataset.vp]) p.variants[+i.dataset.vp].price = +i.value || 0; });
+    $('#md').querySelectorAll('[data-vs]').forEach(i => { if (p.variants[+i.dataset.vs]) p.variants[+i.dataset.vs].inStock = i.checked; });
   };
 
   const draw = () => {
@@ -224,23 +226,46 @@ function editProduct(id) {
       <label>القسم</label><select id="fc">${D.categories.map(c =>
         `<option value="${esc(c.id)}" ${c.id === p.category ? 'selected' : ''}>${esc(c.icon || '')} ${esc(c.name)}</option>`).join('')}</select>
       <label>الوصف</label><textarea id="fd">${esc(p.description)}</textarea>
-      <label>الصورة</label>
+      <label>الصورة العامة للمنتج (اختياري)</label>
       <div class="row"><div class="list"><div class="it" style="border:0;padding:0"><div class="th" style="width:64px;height:64px">${th}</div></div></div>
         <input type="file" id="ff" accept="image/*" style="flex:1;min-width:150px">
         ${p.image ? '<button class="btn danger sm" id="fr">إزالة</button>' : ''}</div>
       <label>السعر (يُستخدم إذا لم تكن هناك أنواع)</label><input type="number" id="fp" min="0" value="${p.price || 0}">
-      <label>الأنواع (اختياري — مثل: شامبو للشعر الدهني / الجاف / ضد القشرة، لكل نوع سعره)</label>
-      <div id="vs">${p.variants.map((v, i) => `<div class="vrow">
-        <input type="text" data-vn="${i}" value="${esc(v.name)}" placeholder="اسم النوع">
-        <input type="number" data-vp="${i}" min="0" value="${v.price || 0}" placeholder="السعر">
-        <label style="margin:0;white-space:nowrap"><input type="checkbox" data-vs="${i}" ${v.inStock !== false ? 'checked' : ''}> متوفر</label>
-        <button class="btn danger sm" data-vd="${i}">×</button></div>`).join('')}</div>
-      <button class="btn sec sm" id="va">+ إضافة نوع</button>
-      <div class="row" style="margin-top:18px"><button class="btn" id="fs">موافق</button><button class="btn sec" id="fcn">إلغاء</button></div>`;
+      <label>الأنواع (اختياري — لكل نوع اسم، سعر، وصورة خاصة به)</label>
+      <div id="vs">${p.variants.map((v, i) => {
+        const vth = v.image ? `<img src="${esc(previews[v.image] || v.image)}" alt="">` : '🖼️';
+        return `<div class="vrow" style="flex-wrap:wrap;gap:8px;align-items:center">
+          <div class="th" style="width:44px;height:44px;flex-shrink:0">${vth}</div>
+          <input type="text" data-vn="${i}" value="${esc(v.name)}" placeholder="اسم النوع" style="flex:1;min-width:120px">
+          <input type="number" data-vp="${i}" min="0" value="${v.price || 0}" placeholder="السعر" style="width:100px">
+          <label style="margin:0;white-space:nowrap"><input type="checkbox" data-vs="${i}" ${v.inStock !== false ? 'checked' : ''}> متوفر</label>
+          <input type="file" data-vf="${i}" accept="image/*" style="max-width:170px">
+          ${v.image ? `<button type="button" class="btn danger sm" data-vr="${i}">إزالة الصورة</button>` : ''}
+          <button type="button" class="btn danger sm" data-vd="${i}">×</button>
+        </div>`;
+      }).join('')}</div>
+      <button type="button" class="btn sec sm" id="va" style="margin-top:8px">+ إضافة نوع</button>
+      <div class="row" style="margin-top:18px"><button type="button" class="btn" id="fs">موافق</button><button type="button" class="btn sec" id="fcn">إلغاء</button></div>`;
 
     $('#mx').onclick = $('#fcn').onclick = closeModal;
-    $('#va').onclick = () => { sync(); p.variants.push({ name: '', price: p.price || 0, inStock: true }); draw(); };
+    $('#va').onclick = () => { sync(); p.variants.push({ name: '', price: p.price || 0, inStock: true, image: '' }); draw(); };
     $('#md').querySelectorAll('[data-vd]').forEach(b => b.onclick = () => { sync(); p.variants.splice(+b.dataset.vd, 1); draw(); });
+    $('#md').querySelectorAll('[data-vr]').forEach(b => b.onclick = () => { sync(); p.variants[+b.dataset.vr].image = ''; draw(); });
+    $('#md').querySelectorAll('[data-vf]').forEach(inp => {
+      inp.onchange = async e => {
+        const f = e.target.files[0]; if (!f) return;
+        const idx = +inp.dataset.vf;
+        sync();
+        toast('جاري رفع صورة النوع...');
+        try {
+          p.variants[idx].image = await uploadImage(f);
+          toast('تم رفع صورة النوع ✓');
+        } catch (err) {
+          toast('فشل رفع الصورة: ' + err.message);
+        }
+        draw();
+      };
+    });
     if ($('#fr')) $('#fr').onclick = () => { sync(); p.image = ''; draw(); };
     $('#ff').onchange = async e => {
       const f = e.target.files[0]; if (!f) return;
@@ -253,7 +278,14 @@ function editProduct(id) {
       sync();
       p.name = p.name.trim();
       if (!p.name) { toast('اكتبي اسم المنتج'); return; }
-      p.variants = p.variants.filter(v => v.name.trim()).map(v => ({ name: v.name.trim(), price: +v.price || 0, inStock: v.inStock !== false }));
+      p.variants = p.variants
+        .filter(v => v.name.trim())
+        .map(v => ({
+          name: v.name.trim(),
+          price: +v.price || 0,
+          inStock: v.inStock !== false,
+          image: v.image || ''
+        }));
       const names = p.variants.map(v => v.name);
       if (new Set(names).size !== names.length) { toast('أسماء الأنواع يجب ألا تتكرر'); return; }
       if (p.variants.length) p.price = 0;
