@@ -38,30 +38,35 @@
         {
           "name": "ﻟﻠﺸﻌﺮ اﻟﺠﺎف و اﻟﺘﺎﻟﻒ",
           "price": 0,
+          "description": "",
           "inStock": true,
           "image": ""
         },
         {
           "name": "ﻟﻠﺸﻌﺮ اﻟﻌﺎدي 300ﻣﻞ",
-          "price": 0,
+          "price": 5500,
+          "description": "تلبتبلتب",
           "inStock": true,
           "image": "images/1795097400500.jpg"
         },
         {
           "name": "ﺷﺎمبو اﻟﺠﺴﻢ 300lg",
           "price": 0,
+          "description": "",
           "inStock": true,
           "image": ""
         },
         {
           "name": "ﻟﻠﺸﻌﺮ اﻟﺪﻫﻨي 300ﻣﻞ",
           "price": 0,
+          "description": "",
           "inStock": true,
           "image": ""
         },
         {
           "name": "اليومي ﻟﻠﺸﻌﺮ 200 ﻣﯿﻞ",
           "price": 0,
+          "description": "",
           "inStock": true,
           "image": ""
         }
