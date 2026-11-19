@@ -10,7 +10,22 @@ let cat = 'all', q = '';
 const hasVariants = p => Array.isArray(p.variants) && p.variants.length > 0;
 const minPrice = p => hasVariants(p) ? Math.min(...p.variants.map(v => +v.price || 0)) : (+p.price || 0);
 const catOf = p => D.categories.find(c => c.id === p.category);
-const thumb = p => p.image ? `<img src="${esc(p.image)}" alt="${esc(p.name)}" loading="lazy">` : (catOf(p)?.icon || '🛍️');
+
+// ترجع صورة النوع إن وجدت، وإلا صورة المنتج العامة، وإلا أيقونة القسم
+const thumb = (p, v = null) => {
+  const src = v?.image || p.image || '';
+  if (src) return `<img src="${esc(src)}" alt="${esc(v?.name ? `${p.name} - ${v.name}` : p.name)}" loading="lazy">`;
+  return catOf(p)?.icon || '🛍️';
+};
+
+// صورة افتراضية للبطاقة في الشبكة الرئيسية
+const cardThumb = p => {
+  if (hasVariants(p)) {
+    const firstAvailable = p.variants.find(v => v.inStock !== false && v.image) || p.variants.find(v => v.image) || p.variants[0];
+    return thumb(p, firstAvailable);
+  }
+  return thumb(p);
+};
 
 async function init() {
   try { D = await (await fetch('data/store.json?' + Date.now())).json(); } catch (e) { console.error(e); }
@@ -34,7 +49,7 @@ function renderGrid() {
     (!q || (p.name + ' ' + (p.description || '')).toLowerCase().includes(q.toLowerCase())));
   $('#grid').innerHTML = list.length ? list.map(p => `
     <div class="card" data-id="${esc(p.id)}">
-      <div class="img">${thumb(p)}</div>
+      <div class="img">${cardThumb(p)}</div>
       <div class="b">
         <h3>${esc(p.name)}</h3>
         <div class="pr">${hasVariants(p) && p.variants.length > 1 ? 'من ' : ''}${fmt(minPrice(p))} ${esc(D.settings.currency || '')}</div>
@@ -50,54 +65,82 @@ function openProduct(id) {
   const p = D.products.find(x => x.id === id); if (!p) return;
   let sel = hasVariants(p) ? p.variants.findIndex(v => v.inStock !== false) : -1;
   let qty = 1;
+
   const draw = () => {
-    const price = hasVariants(p) ? (p.variants[sel]?.price || 0) : p.price;
+    const activeVariant = hasVariants(p) && sel >= 0 ? p.variants[sel] : null;
+    const price = activeVariant ? (activeVariant.price || 0) : p.price;
+
     $('#pmodal').innerHTML = `
       <button class="x" id="px">×</button>
-      <div class="pimg">${thumb(p)}</div>
+      <div class="pimg">${thumb(p, activeVariant)}</div>
       <h2 style="margin:0">${esc(p.name)}</h2>
       <div class="tag" style="color:var(--muted)">${esc(catOf(p)?.name || '')}</div>
       <p>${esc(p.description || '')}</p>
-      ${hasVariants(p) ? `<div><b>اختاري النوع:</b></div><div class="chips">${p.variants.map((v, i) =>
-        `<span class="chip ${i === sel ? 'on' : ''} ${v.inStock === false ? 'off' : ''}" data-i="${i}">${esc(v.name)} — ${fmt(v.price)}</span>`).join('')}</div>` : ''}
+      ${hasVariants(p) ? `<div><b>اختاري النوع:</b></div><div class="chips">${p.variants.map((v, i) => `
+        <span class="chip ${i === sel ? 'on' : ''} ${v.inStock === false ? 'off' : ''}" data-i="${i}">
+          ${v.image ? `<img src="${esc(v.image)}" alt="${esc(v.name)}" style="width:20px;height:20px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-left:4px">` : ''}
+          ${esc(v.name)} — ${fmt(v.price)}
+        </span>`).join('')}</div>` : ''}
       <div class="row" style="justify-content:space-between">
         <div style="font-size:1.3rem;color:var(--pink);font-weight:700">${fmt(price)} ${esc(D.settings.currency || '')}</div>
         <div class="qty"><button id="qm">−</button><span>${qty}</span><button id="qp">+</button></div>
       </div>
       <button class="btn" id="add" style="width:100%;margin-top:14px" ${sel < 0 && hasVariants(p) ? 'disabled' : ''}>أضيفي إلى السلة</button>`;
+
     $('#px').onclick = () => $('#pov').classList.remove('show');
     $('#pmodal').querySelectorAll('.chip').forEach(c => c.onclick = () => {
-      const i = +c.dataset.i; if (p.variants[i].inStock === false) return; sel = i; draw();
+      const i = +c.dataset.i;
+      if (p.variants[i].inStock === false) return;
+      sel = i;
+      draw();
     });
     $('#qm').onclick = () => { qty = Math.max(1, qty - 1); draw(); };
     $('#qp').onclick = () => { qty++; draw(); };
     $('#add').onclick = () => {
-      const v = hasVariants(p) ? p.variants[sel].name : '';
+      const v = activeVariant ? activeVariant.name : '';
       const ex = cart.find(c => c.pid === p.id && c.v === v);
       ex ? ex.q += qty : cart.push({ pid: p.id, v, q: qty });
       saveCart(); $('#pov').classList.remove('show'); openCart();
     };
   };
-  draw(); $('#pov').classList.add('show');
+
+  draw();
+  $('#pov').classList.add('show');
 }
 $('#pov').onclick = e => { if (e.target.id === 'pov') $('#pov').classList.remove('show'); };
 
 function saveCart() { try { localStorage.setItem('cart', JSON.stringify(cart)); } catch (e) {} renderCart(); }
+
 function resolve(c) {
-  const p = D.products.find(x => x.id === c.pid); if (!p) return null;
+  const p = D.products.find(x => x.id === c.pid);
+  if (!p) return null;
   let price = p.price;
-  if (hasVariants(p)) { const v = p.variants.find(x => x.name === c.v); if (!v) return null; price = v.price; }
-  return { p, price: +price || 0 };
+  let variant = null;
+  if (hasVariants(p)) {
+    variant = p.variants.find(x => x.name === c.v);
+    if (!variant) return null;
+    price = variant.price;
+  }
+  return { p, variant, price: +price || 0 };
 }
+
 function renderCart() {
   cart = cart.filter(resolve);
   $('#cartCount').textContent = cart.reduce((s, c) => s + c.q, 0);
   if (!cart.length) { $('#cartBody').innerHTML = '<div class="empty">السلة فارغة</div>'; $('#cartFoot').innerHTML = ''; return; }
   let total = 0;
   $('#cartBody').innerHTML = cart.map((c, i) => {
-    const r = resolve(c); total += r.price * c.q;
-    return `<div class="ci"><div class="t">${esc(r.p.name)}<small>${esc(c.v)} · ${fmt(r.price)}</small></div>
-      <div class="qty"><button data-m="${i}">−</button><span>${c.q}</span><button data-p="${i}">+</button></div></div>`;
+    const r = resolve(c);
+    total += r.price * c.q;
+    const itemImgSrc = r.variant?.image || r.p.image || '';
+    const imgHtml = itemImgSrc
+      ? `<img src="${esc(itemImgSrc)}" alt="${esc(r.p.name)}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;flex-shrink:0">`
+      : '';
+    return `<div class="ci" style="display:flex;align-items:center;gap:10px">
+      ${imgHtml}
+      <div class="t" style="flex:1">${esc(r.p.name)}<small>${esc(c.v)}${c.v ? ' · ' : ''}${fmt(r.price)}</small></div>
+      <div class="qty"><button data-m="${i}">−</button><span>${c.q}</span><button data-p="${i}">+</button></div>
+    </div>`;
   }).join('');
   $('#cartBody').querySelectorAll('[data-m]').forEach(b => b.onclick = () => { const c = cart[+b.dataset.m]; c.q--; if (c.q < 1) cart.splice(+b.dataset.m, 1); saveCart(); });
   $('#cartBody').querySelectorAll('[data-p]').forEach(b => b.onclick = () => { cart[+b.dataset.p].q++; saveCart(); });
@@ -111,6 +154,7 @@ function renderCart() {
     window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 }
+
 function openCart() { $('#drawer').classList.add('show'); $('#cov').classList.add('show'); }
 function closeCart() { $('#drawer').classList.remove('show'); $('#cov').classList.remove('show'); }
 $('#cartBtn').onclick = openCart; $('#closeCart').onclick = closeCart; $('#cov').onclick = closeCart;
