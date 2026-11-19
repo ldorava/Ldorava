@@ -11,18 +11,18 @@ const hasVariants = p => Array.isArray(p.variants) && p.variants.length > 0;
 const minPrice = p => hasVariants(p) ? Math.min(...p.variants.map(v => +v.price || 0)) : (+p.price || 0);
 const catOf = p => D.categories.find(c => c.id === p.category);
 
-const thumb = (p, v = null) => {
+const thumb = (p, v = null, fit = 'cover') => {
   const src = v?.image || p.image || '';
-  if (src) return `<img src="${esc(src)}" alt="${esc(v?.name ? `${p.name} - ${v.name}` : p.name)}" loading="lazy">`;
+  if (src) return `<img src="${esc(src)}" alt="${esc(v?.name ? `${p.name} - ${v.name}` : p.name)}" loading="lazy" style="width:100%;height:100%;object-fit:${fit};display:block">`;
   return catOf(p)?.icon || '🛍️';
 };
 
 const cardThumb = p => {
   if (hasVariants(p)) {
     const firstAvailable = p.variants.find(v => v.inStock !== false && v.image) || p.variants.find(v => v.image) || p.variants[0];
-    return thumb(p, firstAvailable);
+    return thumb(p, firstAvailable, 'cover');
   }
-  return thumb(p);
+  return thumb(p, null, 'cover');
 };
 
 async function init() {
@@ -71,7 +71,7 @@ function openProduct(id) {
 
     const variantImgHtml = activeVariant?.image
       ? `<div class="v-preview" style="margin:10px 0;padding:8px;border:1px solid rgba(0,0,0,.08);border-radius:12px;background:#fff;display:flex;align-items:center;gap:10px">
-           <img src="${esc(activeVariant.image)}" alt="${esc(activeVariant.name)}" style="width:68px;height:68px;object-fit:cover;border-radius:10px;flex-shrink:0">
+           <img src="${esc(activeVariant.image)}" alt="${esc(activeVariant.name)}" style="width:68px;height:68px;object-fit:contain;border-radius:10px;flex-shrink:0;background:#fafafa">
            <div style="font-size:13px;line-height:1.5">
              <div style="font-weight:700">${esc(activeVariant.name)}</div>
              <div style="color:var(--muted)">صورة النوع المختار</div>
@@ -85,8 +85,8 @@ function openProduct(id) {
 
     $('#pmodal').innerHTML = `
       <button class="x" id="px">×</button>
-      <div class="pimg">${thumb(p, activeVariant)}</div>
-      <h2 style="margin:0">${esc(p.name)}</h2>
+      <div class="pimg" style="width:100%;height:340px;max-height:52vh;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:14px;overflow:hidden;padding:8px;box-sizing:border-box">${thumb(p, activeVariant, 'contain')}</div>
+      <h2 style="margin:10px 0 0">${esc(p.name)}</h2>
       <div class="tag" style="color:var(--muted)">${esc(catOf(p)?.name || '')}</div>
       ${descHtml}
       ${variantImgHtml}
