@@ -248,9 +248,10 @@ function editProduct(id) {
   }));
 
   const md = $('#md');
-  md.style.maxWidth = '680px';
-  md.style.width = '95vw';
-  md.style.maxHeight = '90vh';
+  md.style.maxWidth = '960px';
+  md.style.width = '96vw';
+  md.style.maxHeight = '92vh';
+  md.style.padding = '22px';
   md.style.overflowY = 'auto';
 
   const sync = () => {
@@ -269,7 +270,7 @@ function editProduct(id) {
     md.querySelectorAll('[data-vs]').forEach(i => { if (p.variants[+i.dataset.vs]) p.variants[+i.dataset.vs].inStock = i.checked; });
   };
 
-  const thumbBox = (src, fallback, size = 44) => src
+  const thumbBox = (src, fallback, size = 48) => src
     ? `<div style="width:${size}px;height:${size}px;border-radius:10px;overflow:hidden;flex-shrink:0;border:1px solid rgba(0,0,0,.08);background:#fff;display:flex;align-items:center;justify-content:center">
          <img src="${esc(src)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">
        </div>`
@@ -280,47 +281,47 @@ function editProduct(id) {
   const draw = () => {
     const mainSrc = p.image ? (previews[p.image] || p.image) : '';
     md.innerHTML = `<button class="x" id="mx">×</button>
-      <h2 style="margin-top:0;color:var(--pink)">${isNew ? 'منتج جديد' : 'تعديل المنتج'}</h2>
+      <h2 style="margin-top:0;color:var(--pink);font-size:1.45rem">${isNew ? 'منتج جديد' : 'تعديل المنتج'}</h2>
 
-      <label for="fn">اسم المنتج</label>
-      <input type="text" id="fn" value="${esc(p.name)}" placeholder="مثال: شامبو">
+      <label for="fn" style="font-size:14px">اسم المنتج</label>
+      <input type="text" id="fn" value="${esc(p.name)}" placeholder="مثال: شامبو" style="font-size:15px;padding:11px 12px">
 
-      <label for="fc">القسم</label>
-      <select id="fc">${D.categories.map(c =>
+      <label for="fc" style="font-size:14px">القسم</label>
+      <select id="fc" style="font-size:15px;padding:11px 12px">${D.categories.map(c =>
         `<option value="${esc(c.id)}" ${c.id === p.category ? 'selected' : ''}>${esc(c.icon || '')} ${esc(c.name)}</option>`).join('')}</select>
 
-      <label for="fd">وصف المنتج العام (اختياري)</label>
-      <textarea id="fd" rows="2" style="width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid rgba(0,0,0,.15)" placeholder="وصف مختصر للمنتج...">${esc(p.description || '')}</textarea>
+      <label for="fd" style="font-size:14px">وصف المنتج العام (اختياري)</label>
+      <textarea id="fd" rows="3" style="width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:1px solid rgba(0,0,0,.15);font-size:14px;line-height:1.6" placeholder="وصف مختصر للمنتج...">${esc(p.description || '')}</textarea>
 
-      <label>الصورة العامة للمنتج (اختياري)</label>
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-        ${thumbBox(mainSrc, '🛍️', 56)}
-        <input type="file" id="ff" accept="image/*" style="flex:1;min-width:160px;font-size:12px">
+      <label style="font-size:14px">الصورة العامة للمنتج (اختياري)</label>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+        ${thumbBox(mainSrc, '🛍️', 64)}
+        <input type="file" id="ff" accept="image/*" style="flex:1;min-width:180px;font-size:13px">
         ${p.image ? '<button type="button" class="btn danger sm" id="fr">إزالة</button>' : ''}
       </div>
 
-      <label for="fp">السعر (يُستخدم إذا لم تكن هناك أنواع)</label>
-      <input type="number" id="fp" min="0" value="${p.price || 0}">
+      <label for="fp" style="font-size:14px">السعر (يُستخدم إذا لم تكن هناك أنواع)</label>
+      <input type="number" id="fp" min="0" value="${p.price || 0}" style="font-size:15px;padding:11px 12px">
 
-      <label style="margin-top:14px">الأنواع (لكل نوع اسم، سعر، وصف، مواصفات، طريقة استعمال، وصورة)</label>
-      <div id="vs" style="display:flex;flex-direction:column;gap:12px;margin-top:8px">
+      <label style="margin-top:16px;font-size:14.5px">الأنواع (لكل نوع اسم، سعر، وصف، مواصفات، طريقة استعمال، وصورة)</label>
+      <div id="vs" style="display:flex;flex-direction:column;gap:14px;margin-top:10px">
         ${p.variants.map((v, i) => {
           const vSrc = v.image ? (previews[v.image] || v.image) : '';
-          return `<div style="border:1px solid rgba(0,0,0,.12);border-radius:12px;padding:12px;background:#fff;display:flex;flex-direction:column;gap:10px">
+          return `<div style="border:1px solid rgba(0,0,0,.12);border-radius:14px;padding:14px;background:#fff;display:flex;flex-direction:column;gap:10px">
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-              ${thumbBox(vSrc, '🖼️', 44)}
-              <input type="text" data-vn="${i}" value="${esc(v.name)}" placeholder="اسم النوع" style="flex:1;min-width:150px">
-              <input type="number" data-vp="${i}" min="0" value="${v.price || 0}" placeholder="السعر" style="width:110px">
+              ${thumbBox(vSrc, '🖼️', 48)}
+              <input type="text" data-vn="${i}" value="${esc(v.name)}" placeholder="اسم النوع" style="flex:1;min-width:180px;font-size:14.5px;padding:10px 12px">
+              <input type="number" data-vp="${i}" min="0" value="${v.price || 0}" placeholder="السعر" style="width:130px;font-size:14.5px;padding:10px 12px">
             </div>
-            <input type="text" data-vdsc="${i}" value="${esc(v.description || '')}" placeholder="وصف مختصر لهذا النوع..." style="width:100%;box-sizing:border-box">
-            <textarea data-vsp="${i}" rows="2" placeholder="المواصفات الخاصة بهذا النوع..." style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.15)">${esc(v.specs || '')}</textarea>
-            <textarea data-vus="${i}" rows="2" placeholder="طريقة الاستعمال الخاصة بهذا النوع..." style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.15)">${esc(v.usage || '')}</textarea>
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding-top:6px;border-top:1px dashed rgba(0,0,0,.08)">
-              <label style="margin:0;display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+            <input type="text" data-vdsc="${i}" value="${esc(v.description || '')}" placeholder="وصف مختصر لهذا النوع..." style="width:100%;box-sizing:border-box;font-size:14px;padding:10px 12px">
+            <textarea data-vsp="${i}" rows="3" placeholder="المواصفات الخاصة بهذا النوع..." style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.15);font-size:14px;line-height:1.6">${esc(v.specs || '')}</textarea>
+            <textarea data-vus="${i}" rows="3" placeholder="طريقة الاستعمال الخاصة بهذا النوع..." style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.15);font-size:14px;line-height:1.6">${esc(v.usage || '')}</textarea>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding-top:8px;border-top:1px dashed rgba(0,0,0,.08)">
+              <label style="margin:0;display:inline-flex;align-items:center;gap:6px;font-size:14px;cursor:pointer">
                 <input type="checkbox" data-vs="${i}" ${v.inStock !== false ? 'checked' : ''}> متوفر
               </label>
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                <input type="file" data-vf="${i}" accept="image/*" style="max-width:190px;font-size:12px">
+                <input type="file" data-vf="${i}" accept="image/*" style="max-width:210px;font-size:12px">
                 ${v.image ? `<button type="button" class="btn danger sm" data-vr="${i}">إزالة الصورة</button>` : ''}
                 <button type="button" class="btn danger sm" data-vd="${i}">×</button>
               </div>
@@ -329,17 +330,17 @@ function editProduct(id) {
         }).join('')}
       </div>
 
-      <button type="button" class="btn sec sm" id="va" style="margin-top:12px">+ إضافة نوع</button>
+      <button type="button" class="btn sec" id="va" style="margin-top:12px">+ إضافة نوع</button>
 
-      <label for="fsp" style="margin-top:16px">المواصفات العامة للمنتج (تظهر في الأسفل إذا لم يحدد للنوع)</label>
-      <textarea id="fsp" rows="3" style="width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid rgba(0,0,0,.15)" placeholder="مثال: الحجم 300 مل، مناسب للشعر العادي، خالٍ من السلفات...">${esc(p.specs || '')}</textarea>
+      <label for="fsp" style="margin-top:18px;font-size:14px">المواصفات العامة للمنتج (تظهر في الأسفل إذا لم يحدد للنوع)</label>
+      <textarea id="fsp" rows="4" style="width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:1px solid rgba(0,0,0,.15);font-size:14px;line-height:1.65" placeholder="مثال: الحجم 300 مل، مناسب للشعر العادي، خالٍ من السلفات...">${esc(p.specs || '')}</textarea>
 
-      <label for="fus" style="margin-top:12px">طريقة الاستعمال العامة للمنتج (تظهر في الأسفل إذا لم يحدد للنوع)</label>
-      <textarea id="fus" rows="3" style="width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid rgba(0,0,0,.15)" placeholder="مثال: يُوضع على شعر مبلل ويُدلّك بلطف ثم يُشطف بالماء...">${esc(p.usage || '')}</textarea>
+      <label for="fus" style="margin-top:12px;font-size:14px">طريقة الاستعمال العامة للمنتج (تظهر في الأسفل إذا لم يحدد للنوع)</label>
+      <textarea id="fus" rows="4" style="width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:1px solid rgba(0,0,0,.15);font-size:14px;line-height:1.65" placeholder="مثال: يُوضع على شعر مبلل ويُدلّك بلطف ثم يُشطف بالماء...">${esc(p.usage || '')}</textarea>
 
-      <div class="row" style="margin-top:20px">
-        <button type="button" class="btn" id="fs">موافق</button>
-        <button type="button" class="btn sec" id="fcn">إلغاء</button>
+      <div class="row" style="margin-top:22px">
+        <button type="button" class="btn" id="fs" style="padding:10px 24px;font-size:15px">موافق</button>
+        <button type="button" class="btn sec" id="fcn" style="padding:10px 20px;font-size:15px">إلغاء</button>
       </div>`;
 
     $('#mx').onclick = $('#fcn').onclick = closeModal;
