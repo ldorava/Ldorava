@@ -210,15 +210,22 @@ function editProduct(id) {
     : JSON.parse(JSON.stringify(D.products.find(x => x.id === id)));
   p.variants = (p.variants || []).map(v => ({ ...v, image: v.image || '' }));
 
+  // توسيع النافذة لتكون مريحة وتعرض القائمة بشكل أوسع
+  const md = $('#md');
+  md.style.maxWidth = '680px';
+  md.style.width = '95vw';
+  md.style.maxHeight = '90vh';
+  md.style.overflowY = 'auto';
+
   const sync = () => {
     if (!$('#fn')) return;
     p.name = $('#fn').value;
     p.category = $('#fc').value;
     p.description = $('#fd').value;
     p.price = +$('#fp').value || 0;
-    $('#md').querySelectorAll('[data-vn]').forEach(i => { if (p.variants[+i.dataset.vn]) p.variants[+i.dataset.vn].name = i.value; });
-    $('#md').querySelectorAll('[data-vp]').forEach(i => { if (p.variants[+i.dataset.vp]) p.variants[+i.dataset.vp].price = +i.value || 0; });
-    $('#md').querySelectorAll('[data-vs]').forEach(i => { if (p.variants[+i.dataset.vs]) p.variants[+i.dataset.vs].inStock = i.checked; });
+    md.querySelectorAll('[data-vn]').forEach(i => { if (p.variants[+i.dataset.vn]) p.variants[+i.dataset.vn].name = i.value; });
+    md.querySelectorAll('[data-vp]').forEach(i => { if (p.variants[+i.dataset.vp]) p.variants[+i.dataset.vp].price = +i.value || 0; });
+    md.querySelectorAll('[data-vs]').forEach(i => { if (p.variants[+i.dataset.vs]) p.variants[+i.dataset.vs].inStock = i.checked; });
   };
 
   const thumbBox = (src, fallback, size = 44) => src
@@ -231,7 +238,7 @@ function editProduct(id) {
 
   const draw = () => {
     const mainSrc = p.image ? (previews[p.image] || p.image) : '';
-    $('#md').innerHTML = `<button class="x" id="mx">×</button>
+    md.innerHTML = `<button class="x" id="mx">×</button>
       <h2 style="margin-top:0;color:var(--pink)">${isNew ? 'منتج جديد' : 'تعديل المنتج'}</h2>
 
       <label for="fn">اسم المنتج</label>
@@ -241,8 +248,8 @@ function editProduct(id) {
       <select id="fc">${D.categories.map(c =>
         `<option value="${esc(c.id)}" ${c.id === p.category ? 'selected' : ''}>${esc(c.icon || '')} ${esc(c.name)}</option>`).join('')}</select>
 
-      <label for="fd">الوصف</label>
-      <textarea id="fd" rows="4" placeholder="اكتبي وصف المنتج ومواصفاته هنا...">${esc(p.description || '')}</textarea>
+      <label for="fd">وصف المنتج</label>
+      <textarea id="fd" rows="4" style="width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid rgba(0,0,0,.15)" placeholder="اكتبي وصف المنتج ومواصفاته هنا...">${esc(p.description || '')}</textarea>
 
       <label>الصورة العامة للمنتج (اختياري)</label>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
@@ -254,22 +261,22 @@ function editProduct(id) {
       <label for="fp">السعر (يُستخدم إذا لم تكن هناك أنواع)</label>
       <input type="number" id="fp" min="0" value="${p.price || 0}">
 
-      <label style="margin-top:12px">الأنواع (اختياري — لكل نوع اسم، سعر، وصورة خاصة به)</label>
-      <div id="vs" style="display:flex;flex-direction:column;gap:10px;margin-top:6px;max-height:440px;overflow-y:auto;padding-left:4px">
+      <label style="margin-top:14px">الأنواع (اختياري — لكل نوع اسم، سعر، وصورة خاصة به)</label>
+      <div id="vs" style="display:flex;flex-direction:column;gap:12px;margin-top:8px">
         ${p.variants.map((v, i) => {
           const vSrc = v.image ? (previews[v.image] || v.image) : '';
-          return `<div style="border:1px solid rgba(0,0,0,.1);border-radius:12px;padding:10px;background:#fff;display:flex;flex-direction:column;gap:8px">
-            <div style="display:flex;align-items:center;gap:8px">
-              ${thumbBox(vSrc, '🖼️', 42)}
-              <input type="text" data-vn="${i}" value="${esc(v.name)}" placeholder="اسم النوع" style="flex:1;min-width:0">
-              <input type="number" data-vp="${i}" min="0" value="${v.price || 0}" placeholder="السعر" style="width:92px">
+          return `<div style="border:1px solid rgba(0,0,0,.12);border-radius:12px;padding:12px;background:#fff;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              ${thumbBox(vSrc, '🖼️', 44)}
+              <input type="text" data-vn="${i}" value="${esc(v.name)}" placeholder="اسم النوع" style="flex:1;min-width:150px">
+              <input type="number" data-vp="${i}" min="0" value="${v.price || 0}" placeholder="السعر" style="width:110px">
             </div>
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding-top:4px;border-top:1px dashed rgba(0,0,0,.08)">
-              <label style="margin:0;display:inline-flex;align-items:center;gap:5px;font-size:13px;cursor:pointer">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding-top:6px;border-top:1px dashed rgba(0,0,0,.08)">
+              <label style="margin:0;display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
                 <input type="checkbox" data-vs="${i}" ${v.inStock !== false ? 'checked' : ''}> متوفر
               </label>
-              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-                <input type="file" data-vf="${i}" accept="image/*" style="max-width:165px;font-size:11px">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <input type="file" data-vf="${i}" accept="image/*" style="max-width:190px;font-size:12px">
                 ${v.image ? `<button type="button" class="btn danger sm" data-vr="${i}">إزالة الصورة</button>` : ''}
                 <button type="button" class="btn danger sm" data-vd="${i}">×</button>
               </div>
@@ -278,18 +285,18 @@ function editProduct(id) {
         }).join('')}
       </div>
 
-      <button type="button" class="btn sec sm" id="va" style="margin-top:10px">+ إضافة نوع</button>
+      <button type="button" class="btn sec sm" id="va" style="margin-top:12px">+ إضافة نوع</button>
 
-      <div class="row" style="margin-top:18px">
+      <div class="row" style="margin-top:20px">
         <button type="button" class="btn" id="fs">موافق</button>
         <button type="button" class="btn sec" id="fcn">إلغاء</button>
       </div>`;
 
     $('#mx').onclick = $('#fcn').onclick = closeModal;
     $('#va').onclick = () => { sync(); p.variants.push({ name: '', price: p.price || 0, inStock: true, image: '' }); draw(); };
-    $('#md').querySelectorAll('[data-vd]').forEach(b => b.onclick = () => { sync(); p.variants.splice(+b.dataset.vd, 1); draw(); });
-    $('#md').querySelectorAll('[data-vr]').forEach(b => b.onclick = () => { sync(); p.variants[+b.dataset.vr].image = ''; draw(); });
-    $('#md').querySelectorAll('[data-vf]').forEach(inp => {
+    md.querySelectorAll('[data-vd]').forEach(b => b.onclick = () => { sync(); p.variants.splice(+b.dataset.vd, 1); draw(); });
+    md.querySelectorAll('[data-vr]').forEach(b => b.onclick = () => { sync(); p.variants[+b.dataset.vr].image = ''; draw(); });
+    md.querySelectorAll('[data-vf]').forEach(inp => {
       inp.onchange = async e => {
         const f = e.target.files[0]; if (!f) return;
         const idx = +inp.dataset.vf;
