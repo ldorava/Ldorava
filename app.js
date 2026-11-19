@@ -44,7 +44,7 @@ function renderNav() {
 function renderGrid() {
   const list = D.products.filter(p =>
     (cat === 'all' || p.category === cat) &&
-    (!q || (p.name + ' ' + (p.description || '') + ' ' + (p.variants || []).map(v => v.description || '').join(' ')).toLowerCase().includes(q.toLowerCase())));
+    (!q || (p.name + ' ' + (p.description || '') + ' ' + (p.details || '') + ' ' + (p.variants || []).map(v => v.description || '').join(' ')).toLowerCase().includes(q.toLowerCase())));
   $('#grid').innerHTML = list.length ? list.map(p => `
     <div class="card" data-id="${esc(p.id)}">
       <div class="img">${cardThumb(p)}</div>
@@ -68,6 +68,7 @@ function openProduct(id) {
     const activeVariant = hasVariants(p) && sel >= 0 ? p.variants[sel] : null;
     const price = activeVariant ? (activeVariant.price || 0) : p.price;
     const descText = (activeVariant?.description || '').trim() || (p.description || '').trim();
+    const fullDetailsText = (p.details || '').trim();
 
     const variantImgHtml = activeVariant?.image
       ? `<div class="v-preview" style="margin:10px 0;padding:8px;border:1px solid rgba(0,0,0,.08);border-radius:12px;background:#fff;display:flex;align-items:center;gap:10px">
@@ -81,6 +82,13 @@ function openProduct(id) {
 
     const descHtml = descText
       ? `<div class="p-desc" style="margin:10px 0;padding:10px 12px;border-radius:10px;background:rgba(0,0,0,.03);line-height:1.65;white-space:pre-line">${esc(descText)}</div>`
+      : '';
+
+    const detailsHtml = fullDetailsText
+      ? `<div class="p-details" style="margin-top:16px;padding:14px;border-radius:12px;border:1px solid rgba(0,0,0,.09);background:#fafafa;line-height:1.75;white-space:pre-line">
+           <div style="font-weight:700;margin-bottom:6px;color:var(--pink)">الوصف الكامل والمكونات وطريقة الاستخدام</div>
+           <div>${esc(fullDetailsText)}</div>
+         </div>`
       : '';
 
     $('#pmodal').innerHTML = `
@@ -99,7 +107,8 @@ function openProduct(id) {
         <div style="font-size:1.3rem;color:var(--pink);font-weight:700">${fmt(price)} ${esc(D.settings.currency || '')}</div>
         <div class="qty"><button id="qm">−</button><span>${qty}</span><button id="qp">+</button></div>
       </div>
-      <button class="btn" id="add" style="width:100%;margin-top:14px" ${sel < 0 && hasVariants(p) ? 'disabled' : ''}>أضيفي إلى السلة</button>`;
+      <button class="btn" id="add" style="width:100%;margin-top:14px" ${sel < 0 && hasVariants(p) ? 'disabled' : ''}>أضيفي إلى السلة</button>
+      ${detailsHtml}`;
 
     $('#px').onclick = () => $('#pov').classList.remove('show');
     $('#pmodal').querySelectorAll('.chip').forEach(c => c.onclick = () => {
