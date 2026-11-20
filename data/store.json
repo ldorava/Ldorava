@@ -85,56 +85,239 @@
       "usage": ""
     },
     {
-      "id": "p2",
-      "name": "كريم مرطب للوجه",
+      "id": "pmwowy1b6j81",
+      "name": "صابون",
       "category": "skincare",
-      "description": "ترطيب عميق لمدة 24 ساعة.",
-      "image": "",
-      "price": 15000,
-      "variants": []
-    },
-    {
-      "id": "p3",
-      "name": "أحمر شفاه مطفي",
-      "category": "makeup",
-      "description": "ثبات عالٍ وألوان متعددة.",
+      "description": "",
+      "specs": "",
+      "usage": "",
       "image": "",
       "price": 0,
       "variants": [
         {
-          "name": "وردي",
-          "price": 8000,
-          "inStock": true
+          "name": "صابون الأعشاب لدورا هربال بخلاصة اللافندر ونباته 70 غرام",
+          "price": 0,
+          "description": "",
+          "specs": "",
+          "usage": "",
+          "inStock": true,
+          "image": ""
         },
         {
-          "name": "أحمر",
-          "price": 8000,
-          "inStock": true
+          "name": "صابون الأعشاب لدورا هربال بخلاصة العسل و الزعفران 70 غرام",
+          "price": 0,
+          "description": "",
+          "specs": "",
+          "usage": "",
+          "inStock": true,
+          "image": ""
         },
         {
-          "name": "نude",
-          "price": 8000,
-          "inStock": true
+          "name": "صابون الأعشاب لدورا هربال بخلاصة الصنوبر والمريمية 70 غرام",
+          "price": 0,
+          "description": "",
+          "specs": "",
+          "usage": "",
+          "inStock": true,
+          "image": ""
         }
       ]
     },
     {
-      "id": "p4",
-      "name": "عطر زهري",
+      "id": "pmwox5twsrxt",
+      "name": "اودي برفيوم للرجال موديل EL NIDO من لدورا فرجرنس 100 مل",
       "category": "perfume",
-      "description": "عطر نسائي بنفحات الورد والمسك.",
+      "description": "",
+      "specs": "",
+      "usage": "",
+      "image": "",
+      "price": 0,
+      "variants": []
+    },
+    {
+      "id": "pmwox6oii0ti",
+      "name": "اودي برفيوم للنساء موديل REETHI RAH من لدورا فرجرنس 100 مل",
+      "category": "perfume",
+      "description": "",
+      "specs": "",
+      "usage": "",
+      "image": "",
+      "price": 0,
+      "variants": []
+    },
+    {
+      "id": "pmwox7a68h8y",
+      "name": "برفیوم Night Light لدورا فرغرنس 100 مل",
+      "category": "perfume",
+      "description": "",
+      "specs": "",
+      "usage": "",
+      "image": "",
+      "price": 0,
+      "variants": []
+    },
+    {
+      "id": "pmwox7wcg0ro",
+      "name": "اودی برفیوم للجنسین مودیل HYRCANIA من لدورا فرجرنس 100میل",
+      "category": "perfume",
+      "description": "",
+      "specs": "",
+      "usage": "",
+      "image": "",
+      "price": 0,
+      "variants": []
+    },
+    {
+      "id": "pmwoxag028gf",
+      "name": "تونيك لدورا هربال بالأعشاب لتقوية الحاجب 40 مل",
+      "category": "skincare",
+      "description": "",
+      "specs": "",
+      "usage": "",
+      "image": "",
+      "price": 0,
+      "variants": []
+    },
+    {
+      "id": "pmwoxellcu10",
+      "name": "كريم",
+      "category": "skincare",
+      "description": "",
+      "specs": "",
+      "usage": "",
       "image": "",
       "price": 0,
       "variants": [
         {
-          "name": "50 مل",
-          "price": 35000,
-          "inStock": true
+          "name": "کریم لدورا هربال بالأعشاب منعم الید و الوجه 50 مل",
+          "price": 0,
+          "description": "",
+          "specs": "",
+          "usage": "",
+          "inStock": true,
+          "image": ""
         },
         {
-          "name": "100 مل",
-          "price": 60000,
-          "inStock": true
+          "name": "كريم متعدد الاستخدامات لتشققات القدم لیدورا 100 غرام",
+          "price": 0,
+          "description": "",
+          "specs": "",
+          "usage": "",
+          "inStock": true,
+          "image": ""
+        },
+        {
+          "name": "کریم اللیل لدورا لتفتیح الوجه و الرقبة بالرمان مناسب لانواع البشرة، 50 مل",
+          "price": 0,
+          "description": "",
+          "specs": "",
+          "usage": "",
+          "inStock": true,
+          "image": ""
+        },
+        {
+          "name": "کریم حول العینین لدورا کر لتجدید شباب البشرة، إزالة الهالات السوداء و الحد من التجاعید 30 مل",
+          "price": 0,
+          "description": "",
+          "specs": "",
+          "usage": "",
+          "inStock": true,
+          "image": ""
+        }
+      ]
+    },
+    {
+      "id": "pmwoxiwam0xt",
+      "name": "ماسك لدورا هربال بالأعشاب المنعّم والمقوي للشعر 200 مل",
+      "category": "skincare",
+      "description": "",
+      "specs": "",
+      "usage": "",
+      "image": "",
+      "price": 0,
+      "variants": []
+    },
+    {
+      "id": "pmwoxj98vqhk",
+      "name": "ماسك لدورا لتفتیح الوجه و الرقبة بالرمان مناسب لانواع البشرة، 100 مل",
+      "category": "skincare",
+      "description": "",
+      "specs": "",
+      "usage": "",
+      "image": "",
+      "price": 0,
+      "variants": []
+    },
+    {
+      "id": "pmwoxk5jtu7t",
+      "name": "تونرلیدورا لتفتیح الوجه بالرمان مناسب لانواع البشرة، 300 مل",
+      "category": "skincare",
+      "description": "",
+      "specs": "",
+      "usage": "",
+      "image": "",
+      "price": 0,
+      "variants": []
+    },
+    {
+      "id": "pmwoxleoi7fu",
+      "name": "سيروم جل",
+      "category": "skincare",
+      "description": "",
+      "specs": "",
+      "usage": "",
+      "image": "",
+      "price": 0,
+      "variants": [
+        {
+          "name": "سيروم جل مقوّي لبشرة الوجه يحتوي على نحاس ثلاثي الببتيد-1",
+          "price": 0,
+          "description": "",
+          "specs": "",
+          "usage": "",
+          "inStock": true,
+          "image": ""
+        },
+        {
+          "name": "سيروم جل مضاد للتجاعيد لبشرة الوجه",
+          "price": 0,
+          "description": "",
+          "specs": "",
+          "usage": "",
+          "inStock": true,
+          "image": ""
+        }
+      ]
+    },
+    {
+      "id": "pmwoxo4hgkym",
+      "name": "ماسكارا بنية إل إم ۰۳",
+      "category": "makeup",
+      "description": "",
+      "specs": "",
+      "usage": "",
+      "image": "",
+      "price": 0,
+      "variants": []
+    },
+    {
+      "id": "pmwoxp0iqzvf",
+      "name": "واقي شمس",
+      "category": "skincare",
+      "description": "",
+      "specs": "",
+      "usage": "",
+      "image": "",
+      "price": 0,
+      "variants": [
+        {
+          "name": "واقي كريم واقي شمس ملوّن مقاوم للماء(FPF) 50+",
+          "price": 0,
+          "description": "",
+          "specs": "",
+          "usage": "",
+          "inStock": true,
+          "image": ""
         }
       ]
     }
