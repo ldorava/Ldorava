@@ -59,9 +59,32 @@ async function loadData() {
   D.settings = D.settings || {}; D.categories = D.categories || []; D.products = D.products || [];
 }
 
+function normalizeProductsStockBeforeSave() {
+  D.products = (D.products || []).map(prod => {
+    const pStock = parseStock(prod.stock);
+    const vars = Array.isArray(prod.variants) ? prod.variants.map(vr => {
+      const vStock = parseStock(vr.stock);
+      return {
+        ...vr,
+        stock: vStock,
+        inStock: vStock !== null ? vStock > 0 : (vr.inStock !== false)
+      };
+    }) : [];
+    return {
+      ...prod,
+      stock: pStock,
+      variants: vars,
+      inStock: vars.length
+        ? vars.some(vr => vr.stock !== null ? vr.stock > 0 : vr.inStock !== false)
+        : (pStock !== null ? pStock > 0 : (prod.inStock !== false))
+    };
+  });
+}
+
 async function saveData() {
   const btn = $('#save'); btn.disabled = true; btn.textContent = 'جاري الحفظ...';
   try {
+    normalizeProductsStockBeforeSave();
     const body = { message: 'تحديث المتجر من لوحة الإدارة', content: enc(JSON.stringify(D, null, 2)), branch: cfg.branch };
     if (sha) body.sha = sha;
     const res = await api('data/store.json', { method: 'PUT', body: JSON.stringify(body) });
@@ -377,9 +400,10 @@ function editProduct(id) {
     p.usage = $('#fus').value;
     p.price = +$('#fp').value || 0;
     p.discount = clampDisc($('#fdisc').value || 0);
-    const rawMainStock = $('#fstock').value;
-    p.stock = parseStock(rawMainStock);
-    p.inStock = p.stock !== null ? p.stock > 0 : ($('#finstock') ? $('#finstock').checked : true);
+    if ($('#fstock')) {
+      p.stock = parseStock($('#fstock').value);
+      p.inStock = p.stock !== null ? p.stock > 0 : ($('#finstock') ? $('#finstock').checked : true);
+    }
 
     md.querySelectorAll('[data-vn]').forEach(i => { if (p.variants[+i.dataset.vn]) p.variants[+i.dataset.vn].name = i.value; });
     md.querySelectorAll('[data-vp]').forEach(i => { if (p.variants[+i.dataset.vp]) p.variants[+i.dataset.vp].price = +i.value || 0; });
@@ -397,10 +421,8 @@ function editProduct(id) {
     md.querySelectorAll('[data-vus]').forEach(i => { if (p.variants[+i.dataset.vus]) p.variants[+i.dataset.vus].usage = i.value; });
     md.querySelectorAll('[data-vs]').forEach(i => {
       const v = p.variants[+i.dataset.vs];
-      if (v) {
+      if (v && v.stock === null) {
         v.inStock = i.checked;
-        if (!v.inStock && v.stock !== null && v.stock > 0) v.stock = 0;
-        if (v.inStock && v.stock === 0) v.stock = 1;
       }
     });
   };
@@ -520,14 +542,26 @@ function editProduct(id) {
       </div>`;
 
     $('#mx').onclick = $('#fcn').onclick = closeModal;
-    $('#fdisc').oninput = () => { sync(); draw(); };
-    $('#fstock').onchange = () => { sync(); draw(); };
+    $('#fdisc').onchange = () => { sync(); draw(); };
     if ($('#finstock')) $('#finstock').onchange = () => { sync(); draw(); };
     md.querySelectorAll('[data-vd], [data-vp]').forEach(inp => {
-      inp.oninput = () => { sync(); draw(); };
-    });
-    md.querySelectorAll('[data-vst], [data-vs]').forEach(inp => {
       inp.onchange = () => { sync(); draw(); };
+    });
+    md.querySelectorAll('[data-vs]').forEach(inp => {
+      inp.onchange = () => {
+        const idx = +inp.dataset.vs;
+        const v = p.variants[idx];
+        if (!v) return;
+        if (!inp.checked) {
+          v.stock = 0;
+          v.inStock = false;
+        } else {
+          if (v.stock === 0) v.stock = 1;
+          v.inStock = true;
+        }
+        sync();
+        draw();
+      };
     });
     $('#va').onclick = () => { sync(); p.variants.push({ name: '', price: p.price || 0, discount: clampDisc(p.discount || 0), stock: null, description: '', specs: '', usage: '', inStock: true, image: '' }); draw(); };
     md.querySelectorAll('[data-vdel]').forEach(b => b.onclick = () => { sync(); p.variants.splice(+b.dataset.vdel, 1); draw(); });
@@ -562,13 +596,16 @@ function editProduct(id) {
       p.specs = (p.specs || '').trim();
       p.usage = (p.usage || '').trim();
       p.discount = clampDisc(p.discount || 0);
-      p.stock = parseStock($('#fstock') ? $('#fstock').value : p.stock);
+      p.stock = $('#fstock') ? parseStock($('#fstock').value) : parseStock(p.stock);
       p.inStock = p.stock !== null ? p.stock > 0 : (p.inStock !== false);
       if (!p.name) { toast('اكتبي اسم المنتج'); return; }
+
+      const stockInputs = [...md.querySelectorAll('[data-vst]')];
       p.variants = p.variants
         .filter(v => v.name.trim())
-        .map(v => {
-          const st = parseStock(v.stock);
+        .map((v, idx) => {
+          const matchedInp = stockInputs.find(el => +el.dataset.vst === idx);
+          const st = matchedInp ? parseStock(matchedInp.value) : parseStock(v.stock);
           return {
             name: v.name.trim(),
             price: +v.price || 0,
