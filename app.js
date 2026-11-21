@@ -2,6 +2,8 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt = n => Number(n || 0).toLocaleString('en-US');
 
+const APP_SHARE_URL = 'https://ldorava.github.io/Ldorava/index.html';
+
 const clampDisc = d => Math.max(0, Math.min(99, Number(d) || 0));
 const discPrice = (price, disc) => {
   const base = Number(price) || 0;
@@ -18,6 +20,7 @@ try { stockDeducted = JSON.parse(localStorage.getItem('stock_deducted') || '{}')
 let cat = 'all', q = '';
 let modalHistoryPushed = false;
 let cartHistoryPushed = false;
+let shareHistoryPushed = false;
 
 const hasVariants = p => Array.isArray(p.variants) && p.variants.length > 0;
 const effectiveVarDisc = (p, v) => clampDisc(v.discount || p.discount || 0);
@@ -81,6 +84,7 @@ function pushOverlayState(kind) {
     history.pushState({ overlay: kind, _ts: Date.now() }, '');
     if (kind === 'product') modalHistoryPushed = true;
     if (kind === 'cart') cartHistoryPushed = true;
+    if (kind === 'share') shareHistoryPushed = true;
   } catch (e) {}
 }
 
@@ -95,7 +99,142 @@ function hideProductOverlay(fromPopstate = false) {
   }
 }
 
+function closeShareModal(fromPopstate = false) {
+  const ov = $('#shareOv');
+  if (!ov) return;
+  const wasOpen = ov.classList.contains('show');
+  ov.classList.remove('show');
+  if (!fromPopstate && wasOpen && shareHistoryPushed) {
+    shareHistoryPushed = false;
+    try { history.back(); } catch (e) {}
+  } else {
+    shareHistoryPushed = false;
+  }
+}
+
+function ensureShareModal() {
+  if ($('#shareOv')) return;
+  const ov = document.createElement('div');
+  ov.id = 'shareOv';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.48);display:none;align-items:center;justify-content:center;padding:16px;z-index:9999';
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=10&data=${encodeURIComponent(APP_SHARE_URL)}`;
+  ov.innerHTML = `
+    <div id="shareBox" style="position:relative;width:100%;max-width:390px;background:#fff;border-radius:20px;padding:24px 20px;box-shadow:0 20px 50px rgba(0,0,0,.22);text-align:center;box-sizing:border-box">
+      <button type="button" id="closeShare" aria-label="إغلاق" style="position:absolute;top:12px;left:12px;width:34px;height:34px;border-radius:50%;border:none;background:rgba(0,0,0,.06);font-size:20px;line-height:1;cursor:pointer">×</button>
+      <h3 style="margin:0 0 6px;color:var(--pink);font-size:1.25rem">مشاركة التطبيق</h3>
+      <p style="margin:0 0 14px;color:var(--muted);font-size:13.5px;line-height:1.6">امسحي الباركود بكاميرا الموبايل أو شاركي الرابط مباشرة مع من تحبين</p>
+      <div style="display:inline-flex;align-items:center;justify-content:center;padding:10px;border:1px solid rgba(0,0,0,.08);border-radius:16px;background:#fafafa;margin-bottom:14px;min-height:220px;min-width:220px">
+        <img src="${esc(qrSrc)}" alt="باركود L'DORA Viva" style="width:200px;height:200px;display:block;border-radius:8px">
+      </div>
+      <div style="background:#f8f9fa;border:1px solid rgba(0,0,0,.08);border-radius:12px;padding:9px 12px;font-size:12.5px;color:#333;word-break:break-all;margin-bottom:14px" dir="ltr">${esc(APP_SHARE_URL)}</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button type="button" class="btn" id="shareLinkBtn" style="width:100%">🔗 مشاركة الرابط</button>
+        <button type="button" class="btn sec" id="copyLinkBtn" style="width:100%">📋 نسخ الرابط</button>
+      </div>
+      <div id="shareStatus" style="margin-top:10px;font-size:13px;color:#157347;font-weight:600;min-height:18px"></div>
+    </div>`;
+  document.body.appendChild(ov);
+
+  ov.onclick = e => { if (e.target.id === 'shareOv') closeShareModal(false); };
+  $('#closeShare').onclick = () => closeShareModal(false);
+
+  $('#copyLinkBtn').onclick = async () => {
+    const st = $('#shareStatus');
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(APP_SHARE_URL);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = APP_SHARE_URL;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+      st.textContent = 'تم نسخ الرابط بنجاح ✓';
+    } catch (e) {
+      st.textContent = 'انسخي الرابط من الصندوق بالأعلى';
+    }
+  };
+
+  $('#shareLinkBtn').onclick = async () => {
+    const st = $('#shareStatus');
+    const shopTitle = D.settings.name || "L'DORA Viva";
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: shopTitle,
+          text: `تصفحي منتجات ${shopTitle} — وكيل شركة L'DORA`,
+          url: APP_SHARE_URL
+        });
+        st.textContent = 'تمت المشاركة ✓';
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;
+      }
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(`${shopTitle}\n${APP_SHARE_URL}`)}`, '_blank');
+    st.textContent = 'تم فتح نافذة المشاركة ✓';
+  };
+}
+
+function openShareModal() {
+  ensureShareModal();
+  const ov = $('#shareOv');
+  $('#shareStatus').textContent = '';
+  const wasOpen = ov.classList.contains('show');
+  ov.style.display = 'flex';
+  ov.classList.add('show');
+  if (!wasOpen) pushOverlayState('share');
+}
+
+const origShareCloseWatcher = () => {
+  const ov = $('#shareOv');
+  if (ov && !ov.classList.contains('show')) ov.style.display = 'none';
+};
+
+function renderAboutSection() {
+  if ($('#aboutVivaSection')) return;
+  const shopName = D.settings.name || "L'DORA Viva";
+  const sec = document.createElement('section');
+  sec.id = 'aboutVivaSection';
+  sec.style.cssText = 'max-width:1100px;margin:32px auto 16px;padding:0 14px;box-sizing:border-box';
+  sec.innerHTML = `
+    <div style="background:linear-gradient(135deg,#fff8fb 0%,#ffffff 100%);border:1px solid rgba(0,0,0,.08);border-radius:20px;padding:24px 20px;box-shadow:0 8px 28px rgba(0,0,0,.05)">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:inline-flex;align-items:center;gap:8px;align-self:flex-start;background:rgba(214,51,108,.1);color:var(--pink);padding:5px 14px;border-radius:999px;font-size:13px;font-weight:700">
+          <span>✨ من نحن</span>
+        </div>
+        <h2 style="margin:0;font-size:1.45rem;color:#1f2937">L'DORA Viva — وكيل شركة L'DORA</h2>
+        <p style="margin:0;color:#4b5563;font-size:14.5px;line-height:1.85">
+          نحن في <b>L'DORA Viva</b> وكيل معتمد لشركة <b>L'DORA</b>، نضع بين يديكِ عناية متكاملة تجمع بين الجودة العالية واللمسة العصرية لتمنحي جمالكِ إشراقة تدوم كل يوم. نحرص بعناية على اختيار منتجات أصلية وموثوقة تناسب مختلف الاحتياجات، مع تجربة تسوق سهلة وسريعة واستشارات مخصصة تساعدكِ في اختيار الأنسب لكِ بثقة وراحة بال.
+        </p>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-top:8px;padding-top:14px;border-top:1px dashed rgba(0,0,0,.1)">
+          <div style="font-size:13px;color:var(--muted)">${esc(shopName)} · وكيل شركة L'DORA</div>
+          <button type="button" class="btn" id="openShareAppBtn" style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:12px;font-size:14px">
+            <span>📲 مشاركة التطبيق</span>
+          </button>
+        </div>
+      </div>
+    </div>`;
+
+  const footer = $('footer');
+  if (footer && footer.parentNode) {
+    footer.parentNode.insertBefore(sec, footer);
+  } else {
+    document.body.appendChild(sec);
+  }
+
+  $('#openShareAppBtn').onclick = openShareModal;
+}
+
 window.addEventListener('popstate', () => {
+  if ($('#shareOv') && $('#shareOv').classList.contains('show')) {
+    shareHistoryPushed = false;
+    closeShareModal(true);
+    origShareCloseWatcher();
+    return;
+  }
   if ($('#pov').classList.contains('show')) {
     modalHistoryPushed = false;
     hideProductOverlay(true);
@@ -128,12 +267,12 @@ function reconcileDeductedCache() {
 async function init() {
   try { D = await (await fetch('data/store.json?' + Date.now())).json(); } catch (e) { console.error(e); }
   reconcileDeductedCache();
-  const name = D.settings.name || 'المتجر';
+  const name = D.settings.name || "L'DORA Viva";
   $('#shopName').textContent = name;
   document.title = name;
   $('#yr').textContent = new Date().getFullYear();
   document.querySelectorAll('a[href*="admin"], button[data-admin], #adminBtn, #adminLink').forEach(el => el.remove());
-  renderNav(); renderGrid(); renderCart();
+  renderNav(); renderGrid(); renderCart(); renderAboutSection();
 }
 
 function renderNav() {
@@ -387,7 +526,6 @@ function renderCart() {
     const lines = cart.map(c => { const r = resolve(c); return `• ${r.p.name}${c.v ? ' (' + c.v + ')' : ''} × ${c.q} = ${fmt(r.price * c.q)}`; });
     const msg = `طلب جديد:\n${lines.join('\n')}\nالإجمالي: ${fmt(total)} ${cur}`;
 
-    // خصم الكمية المطلوبة من المخزون تلقائياً وتحديث حالة التوفر
     cart.forEach(c => {
       const r = resolve(c);
       if (!r || r.maxStock === null) return;
