@@ -2,6 +2,13 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt = n => Number(n || 0).toLocaleString('en-US');
 
+const clampDisc = d => Math.max(0, Math.min(99, Number(d) || 0));
+const discPrice = (price, disc) => {
+  const base = Number(price) || 0;
+  const pct = clampDisc(disc);
+  return pct > 0 ? Math.round(base * (1 - pct / 100)) : base;
+};
+
 let D = { settings: {}, categories: [], products: [] };
 let cart = [];
 try { cart = JSON.parse(localStorage.getItem('cart') || '[]'); } catch (e) {}
@@ -10,7 +17,17 @@ let modalHistoryPushed = false;
 let cartHistoryPushed = false;
 
 const hasVariants = p => Array.isArray(p.variants) && p.variants.length > 0;
-const minPrice = p => hasVariants(p) ? Math.min(...p.variants.map(v => +v.price || 0)) : (+p.price || 0);
+const effectiveVarDisc = (p, v) => clampDisc(v.discount || p.discount || 0);
+const minPrice = p => {
+  if (hasVariants(p)) {
+    return Math.min(...p.variants.map(v => discPrice(v.price, effectiveVarDisc(p, v))));
+  }
+  return discPrice(p.price, p.discount || 0);
+};
+const hasAnyDiscount = p => {
+  if (hasVariants(p)) return p.variants.some(v => effectiveVarDisc(p, v) > 0);
+  return clampDisc(p.discount || 0) > 0;
+};
 const catOf = p => D.categories.find(c => c.id === p.category);
 
 const thumb = (p, v = null, fit = 'cover') => {
@@ -64,6 +81,8 @@ async function init() {
   $('#shopName').textContent = name;
   document.title = name;
   $('#yr').textContent = new Date().getFullYear();
+  // إخفاء أو إزالة أي زر دخول للإدارة إذا كان موجوداً في HTML
+  document.querySelectorAll('a[href*="admin"], button[data-admin], #adminBtn, #adminLink').forEach(el => el.remove());
   renderNav(); renderGrid(); renderCart();
 }
 
@@ -75,18 +94,27 @@ function renderNav() {
 }
 
 function renderGrid() {
+  const cur = D.settings.currency || '';
   const list = D.products.filter(p =>
     (cat === 'all' || p.category === cat) &&
     (!q || (p.name + ' ' + (p.description || '') + ' ' + (p.specs || '') + ' ' + (p.usage || '') + ' ' + (p.variants || []).map(v => `${v.description || ''} ${v.specs || ''} ${v.usage || ''}`).join(' ')).toLowerCase().includes(q.toLowerCase())));
-  $('#grid').innerHTML = list.length ? list.map(p => `
-    <div class="card" data-id="${esc(p.id)}">
+  $('#grid').innerHTML = list.length ? list.map(p => {
+    const discounted = hasAnyDiscount(p);
+    const origMin = hasVariants(p) ? Math.min(...p.variants.map(v => +v.price || 0)) : (+p.price || 0);
+    return `
+    <div class="card" data-id="${esc(p.id)}" style="position:relative">
+      ${discounted ? `<span style="position:absolute;top:10px;right:10px;z-index:2;background:#dc3545;color:#fff;font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px">خصم</span>` : ''}
       <div class="img">${cardThumb(p)}</div>
       <div class="b">
         <h3>${esc(p.name)}</h3>
-        <div class="pr">${hasVariants(p) && p.variants.length > 1 ? 'من ' : ''}${fmt(minPrice(p))} ${esc(D.settings.currency || '')}</div>
+        <div class="pr">
+          ${hasVariants(p) && p.variants.length > 1 ? 'من ' : ''}${fmt(minPrice(p))} ${esc(cur)}
+          ${discounted ? `<small style="text-decoration:line-through;color:var(--muted);margin-right:6px;font-weight:400">${fmt(origMin)}</small>` : ''}
+        </div>
         ${hasVariants(p) ? `<div class="tag">${p.variants.length} أنواع</div>` : ''}
       </div>
-    </div>`).join('') : '<div class="empty" style="grid-column:1/-1">لا توجد منتجات</div>';
+    </div>`;
+  }).join('') : '<div class="empty" style="grid-column:1/-1">لا توجد منتجات</div>';
   $('#grid').querySelectorAll('.card').forEach(c => c.onclick = () => openProduct(c.dataset.id));
 }
 
@@ -106,8 +134,12 @@ function openProduct(id) {
   let qty = 1;
 
   const draw = () => {
+    const cur = D.settings.currency || '';
     const activeVariant = hasVariants(p) && sel >= 0 ? p.variants[sel] : null;
-    const price = activeVariant ? (activeVariant.price || 0) : p.price;
+    const rawPrice = activeVariant ? (+activeVariant.price || 0) : (+p.price || 0);
+    const activeDisc = activeVariant ? effectiveVarDisc(p, activeVariant) : clampDisc(p.discount || 0);
+    const finalPrice = discPrice(rawPrice, activeDisc);
+
     const descText = (activeVariant?.description || '').trim() || (p.description || '').trim();
     const specsText = (activeVariant?.specs || '').trim() || (p.specs || '').trim();
     const usageText = (activeVariant?.usage || '').trim() || (p.usage || '').trim();
@@ -139,6 +171,14 @@ function openProduct(id) {
          </div>`
       : '';
 
+    const priceBlockHtml = activeDisc > 0
+      ? `<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+           <span style="font-size:1.3rem;color:var(--pink);font-weight:700">${fmt(finalPrice)} ${esc(cur)}</span>
+           <span style="font-size:.95rem;color:var(--muted);text-decoration:line-through">${fmt(rawPrice)} ${esc(cur)}</span>
+           <span style="background:#ffe5e8;color:#c92a2a;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px">خصم ${activeDisc}%</span>
+         </div>`
+      : `<div style="font-size:1.3rem;color:var(--pink);font-weight:700">${fmt(finalPrice)} ${esc(cur)}</div>`;
+
     $('#pmodal').innerHTML = `
       <button class="x" id="px">×</button>
       <div class="pimg" style="width:100%;height:340px;max-height:52vh;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:14px;overflow:hidden;padding:8px;box-sizing:border-box">${thumb(p, activeVariant, 'contain')}</div>
@@ -152,7 +192,7 @@ function openProduct(id) {
           ${esc(v.name)}
         </span>`).join('')}</div>` : ''}
       <div class="row" style="justify-content:space-between">
-        <div style="font-size:1.3rem;color:var(--pink);font-weight:700">${fmt(price)} ${esc(D.settings.currency || '')}</div>
+        ${priceBlockHtml}
         <div class="qty"><button id="qm">−</button><span>${qty}</span><button id="qp">+</button></div>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
@@ -194,16 +234,19 @@ function resolve(c) {
   const p = D.products.find(x => x.id === c.pid);
   if (!p) return null;
   let price = p.price;
+  let disc = clampDisc(p.discount || 0);
   let variant = null;
   if (hasVariants(p)) {
     variant = p.variants.find(x => x.name === c.v);
     if (!variant) return null;
     price = variant.price;
+    disc = effectiveVarDisc(p, variant);
   }
-  return { p, variant, price: +price || 0 };
+  return { p, variant, price: discPrice(price, disc), origPrice: +price || 0, disc };
 }
 
 function renderCart() {
+  const cur = D.settings.currency || '';
   cart = cart.filter(resolve);
   $('#cartCount').textContent = cart.reduce((s, c) => s + c.q, 0);
   if (!cart.length) { $('#cartBody').innerHTML = '<div class="empty">السلة فارغة</div>'; $('#cartFoot').innerHTML = ''; return; }
@@ -217,17 +260,17 @@ function renderCart() {
       : '';
     return `<div class="ci" style="display:flex;align-items:center;gap:10px">
       ${imgHtml}
-      <div class="t" style="flex:1">${esc(r.p.name)}<small>${esc(c.v)}${c.v ? ' · ' : ''}${fmt(r.price)}</small></div>
+      <div class="t" style="flex:1">${esc(r.p.name)}<small>${esc(c.v)}${c.v ? ' · ' : ''}${fmt(r.price)} ${esc(cur)}${r.disc > 0 ? ` (خصم ${r.disc}%)` : ''}</small></div>
       <div class="qty"><button data-m="${i}">−</button><span>${c.q}</span><button data-p="${i}">+</button></div>
     </div>`;
   }).join('');
   $('#cartBody').querySelectorAll('[data-m]').forEach(b => b.onclick = () => { const c = cart[+b.dataset.m]; c.q--; if (c.q < 1) cart.splice(+b.dataset.m, 1); saveCart(); });
   $('#cartBody').querySelectorAll('[data-p]').forEach(b => b.onclick = () => { cart[+b.dataset.p].q++; saveCart(); });
-  $('#cartFoot').innerHTML = `<div class="row" style="justify-content:space-between;margin-bottom:10px"><b>الإجمالي</b><b>${fmt(total)} ${esc(D.settings.currency || '')}</b></div>
+  $('#cartFoot').innerHTML = `<div class="row" style="justify-content:space-between;margin-bottom:10px"><b>الإجمالي</b><b>${fmt(total)} ${esc(cur)}</b></div>
     <button class="btn" id="order" style="width:100%">إرسال الطلب عبر واتساب</button>`;
   $('#order').onclick = () => {
     const lines = cart.map(c => { const r = resolve(c); return `• ${r.p.name}${c.v ? ' (' + c.v + ')' : ''} × ${c.q} = ${fmt(r.price * c.q)}`; });
-    const msg = `طلب جديد:\n${lines.join('\n')}\nالإجمالي: ${fmt(total)} ${D.settings.currency || ''}`;
+    const msg = `طلب جديد:\n${lines.join('\n')}\nالإجمالي: ${fmt(total)} ${cur}`;
     const num = (D.settings.whatsapp || '').replace(/\D/g, '');
     if (!num) { alert('لم يتم ضبط رقم واتساب في لوحة الإدارة'); return; }
     window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank');
