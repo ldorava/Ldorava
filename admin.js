@@ -16,7 +16,7 @@ const parseStock = val => (val === '' || val === null || val === undefined) ? nu
 let cfg = {};
 try { cfg = JSON.parse(localStorage.getItem('gh_cfg') || '{}'); } catch (e) {}
 let D = { settings: { name: 'المتجر', currency: '', whatsapp: '' }, categories: [], products: [] };
-let sha = null, dirty = false, tab = 'products', filterCat = 'all';
+let sha = null, dirty = false, tab = 'products', filterCat = 'all', filterStock = 'all';
 const previews = {};
 
 function toast(m) {
@@ -67,6 +67,23 @@ async function saveData() {
   } finally { btn.disabled = false; btn.textContent = 'حفظ ونشر'; }
 }
 $('#save').onclick = saveData;
+
+function exportBackup() {
+  try {
+    const blob = new Blob([JSON.stringify(D, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `store-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast('تم تحميل النسخة الاحتياطية ✓');
+  } catch (e) {
+    toast('تعذر إنشاء النسخة الاحتياطية');
+  }
+}
 
 async function uploadImage(file) {
   const img = await createImageBitmap(file);
@@ -157,17 +174,29 @@ const isProdAvail = p => hasVar(p)
   ? p.variants.some(isVarAvail)
   : (p.inStock !== false && (p.stock === null || p.stock === undefined || Number(p.stock) > 0));
 
+const isProdLowStock = p => {
+  if (!isProdAvail(p)) return false;
+  if (hasVar(p)) {
+    return p.variants.some(v => isVarAvail(v) && v.stock !== null && v.stock !== undefined && Number(v.stock) > 0 && Number(v.stock) <= 3);
+  }
+  return p.stock !== null && p.stock !== undefined && Number(p.stock) > 0 && Number(p.stock) <= 3;
+};
+
 const stockBadge = p => {
   if (!isProdAvail(p)) return ' · <span style="color:#c92a2a;font-weight:700">غير متوفر</span>';
   if (hasVar(p)) {
     const tracked = p.variants.filter(v => v.stock !== null && v.stock !== undefined);
     if (tracked.length) {
       const sum = tracked.reduce((a, v) => a + (Number(v.stock) || 0), 0);
-      return ` · المتبقي: ${sum}`;
+      const lowNote = isProdLowStock(p) ? ' <span style="color:#b45309;font-weight:700">(منخفض)</span>' : '';
+      return ` · المتبقي: ${sum}${lowNote}`;
     }
     return '';
   }
-  if (p.stock !== null && p.stock !== undefined) return ` · الكمية: ${p.stock}`;
+  if (p.stock !== null && p.stock !== undefined) {
+    const lowNote = isProdLowStock(p) ? ' <span style="color:#b45309;font-weight:700">(منخفض)</span>' : '';
+    return ` · الكمية: ${p.stock}${lowNote}`;
+  }
   return '';
 };
 
@@ -186,14 +215,31 @@ const priceText = p => {
 };
 
 function viewProducts() {
-  const list = D.products.filter(p => filterCat === 'all' || p.category === filterCat);
+  const list = D.products.filter(p => {
+    const catOk = filterCat === 'all' || p.category === filterCat;
+    if (!catOk) return false;
+    if (filterStock === 'out') return !isProdAvail(p);
+    if (filterStock === 'low') return isProdLowStock(p);
+    return true;
+  });
+
   $('#view').innerHTML = `<div class="panel">
-    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
       <h2 style="margin:0">المنتجات (${list.length})</h2>
-      <button class="btn" id="addP">+ منتج جديد</button>
+      <div class="row" style="gap:8px">
+        <button type="button" class="btn sec sm" id="backupBtn">نسخة احتياطية JSON</button>
+        <button class="btn" id="addP">+ منتج جديد</button>
+      </div>
     </div>
-    <select id="fcat"><option value="all">كل الأقسام</option>${D.categories.map(c =>
-      `<option value="${esc(c.id)}" ${c.id === filterCat ? 'selected' : ''}>${esc(c.icon || '')} ${esc(c.name)}</option>`).join('')}</select>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <select id="fcat" style="flex:1;min-width:150px"><option value="all">كل الأقسام</option>${D.categories.map(c =>
+        `<option value="${esc(c.id)}" ${c.id === filterCat ? 'selected' : ''}>${esc(c.icon || '')} ${esc(c.name)}</option>`).join('')}</select>
+      <select id="fstock" style="flex:1;min-width:150px">
+        <option value="all" ${filterStock === 'all' ? 'selected' : ''}>كل حالات المخزون</option>
+        <option value="low" ${filterStock === 'low' ? 'selected' : ''}>منخفضة الكمية (3 أو أقل)</option>
+        <option value="out" ${filterStock === 'out' ? 'selected' : ''}>غير متوفرة</option>
+      </select>
+    </div>
     <div class="list" style="margin-top:8px">${list.length ? list.map(p => {
       const c = D.categories.find(x => x.id === p.category);
       const varImg = hasVar(p) ? p.variants.find(v => v.image)?.image : '';
@@ -205,6 +251,8 @@ function viewProducts() {
         <button class="btn danger sm" data-d="${esc(p.id)}">حذف</button></div>`;
     }).join('') : '<div class="empty">لا توجد منتجات</div>'}</div></div>`;
   $('#fcat').onchange = e => { filterCat = e.target.value; viewProducts(); };
+  $('#fstock').onchange = e => { filterStock = e.target.value; viewProducts(); };
+  $('#backupBtn').onclick = exportBackup;
   $('#addP').onclick = () => editProduct(null);
   $('#view').querySelectorAll('[data-e]').forEach(b => b.onclick = () => editProduct(b.dataset.e));
   $('#view').querySelectorAll('[data-d]').forEach(b => b.onclick = () => {
