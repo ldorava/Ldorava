@@ -276,7 +276,8 @@ function viewProducts() {
   $('#view').innerHTML = `<div class="panel">
     <div class="row" style="justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
       <h2 style="margin:0">المنتجات (${list.length})</h2>
-      <div class="row" style="gap:8px">
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn sec sm" id="mergeBtn" style="background:#eef6ff;color:#1d4ed8;border:1px solid #bfdbfe">⇄ دمج منتجات</button>
         <button type="button" class="btn sec sm" id="backupBtn">نسخة احتياطية JSON</button>
         <button class="btn" id="addP">+ منتج جديد</button>
       </div>
@@ -302,6 +303,7 @@ function viewProducts() {
     }).join('') : '<div class="empty">لا توجد منتجات</div>'}</div></div>`;
   $('#fcat').onchange = e => { filterCat = e.target.value; viewProducts(); };
   $('#fstock').onchange = e => { filterStock = e.target.value; viewProducts(); };
+  $('#mergeBtn').onclick = openMergeProductsModal;
   $('#backupBtn').onclick = exportBackup;
   $('#addP').onclick = () => editProduct(null);
   $('#view').querySelectorAll('[data-e]').forEach(b => b.onclick = () => editProduct(b.dataset.e));
@@ -310,6 +312,183 @@ function viewProducts() {
     if (!confirm(`حذف "${p.name}"؟`)) return;
     D.products = D.products.filter(x => x.id !== p.id); setDirty(true); viewProducts();
   });
+}
+
+/* ---------- merge products into one with variants ---------- */
+function openMergeProductsModal() {
+  if (D.products.length < 2) {
+    toast('تحتاجين لمنتجين على الأقل للدمج');
+    return;
+  }
+  const md = $('#md');
+  md.style.maxWidth = '720px';
+  md.style.width = '95vw';
+  md.style.maxHeight = '90vh';
+  md.style.padding = '22px';
+  md.style.overflowY = 'auto';
+
+  let mCat = filterCat !== 'all' ? filterCat : 'all';
+  const selectedIds = new Set();
+
+  const drawMerge = () => {
+    const visibleProds = D.products.filter(p => mCat === 'all' || p.category === mCat);
+    const firstSel = D.products.find(p => selectedIds.has(p.id));
+    const defaultCat = firstSel ? firstSel.category : (D.categories[0]?.id || '');
+
+    md.innerHTML = `<button class="x" id="mmx">×</button>
+      <h2 style="margin-top:0;color:var(--pink);font-size:1.35rem">دمج منتجات في منتج واحد (بأنواع)</h2>
+      <p style="margin:0 0 12px;font-size:13.5px;color:#555;line-height:1.6">
+        حددي المنتجات التي تريدين جمعها كأنواع تحت منتج واحد (مثلاً: درجات حمرة أو أحجام عطر مختلفة). سيتم نقل أسعارها وكمياتها وصورها ومواصفاتها تلقائياً.
+      </p>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:12px">
+        <div>
+          <label for="mName" style="font-size:13.5px">اسم المنتج المجمّع الجديد</label>
+          <input type="text" id="mName" placeholder="مثال: أحمر شفاه ليدورا" style="width:100%;box-sizing:border-box;padding:10px;font-size:14.5px">
+        </div>
+        <div>
+          <label for="mTargetCat" style="font-size:13.5px">قسم المنتج المجمّع</label>
+          <select id="mTargetCat" style="width:100%;box-sizing:border-box;padding:10px;font-size:14.5px">${D.categories.map(c =>
+            `<option value="${esc(c.id)}" ${c.id === defaultCat ? 'selected' : ''}>${esc(c.icon || '')} ${esc(c.name)}</option>`).join('')}</select>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <span style="font-size:13.5px;font-weight:700">اختاري المنتجات (${selectedIds.size} محدد):</span>
+        <select id="mFilterCat" style="padding:6px 10px;font-size:13px">
+          <option value="all">تصفية: كل الأقسام</option>
+          ${D.categories.map(c => `<option value="${esc(c.id)}" ${c.id === mCat ? 'selected' : ''}>${esc(c.icon || '')} ${esc(c.name)}</option>`).join('')}
+        </select>
+      </div>
+
+      <div style="border:1px solid rgba(0,0,0,.12);border-radius:12px;max-height:320px;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;background:#fafafa">
+        ${visibleProds.map(p => {
+          const checked = selectedIds.has(p.id);
+          const c = D.categories.find(x => x.id === p.category);
+          const imgSrc = p.image || (hasVar(p) ? p.variants.find(v => v.image)?.image : '') || '';
+          return `<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:${checked ? '#fff0f5' : '#fff'};border:1px solid ${checked ? 'var(--pink)' : 'rgba(0,0,0,.08)'};cursor:pointer;margin:0">
+            <input type="checkbox" data-mpid="${esc(p.id)}" ${checked ? 'checked' : ''}>
+            ${imgSrc
+              ? `<img src="${esc(previews[imgSrc] || imgSrc)}" alt="" style="width:36px;height:36px;border-radius:8px;object-fit:cover;flex-shrink:0">`
+              : `<span style="width:36px;height:36px;border-radius:8px;background:#f3e8ee;display:flex;align-items:center;justify-content:center;flex-shrink:0">${esc(c?.icon || '🛍️')}</span>`}
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:700;font-size:14px">${esc(p.name)}</div>
+              <div style="font-size:12px;color:#666">${esc(c?.name || '')} · ${priceText(p)}</div>
+            </div>
+          </label>`;
+        }).join('')}
+      </div>
+
+      <div class="row" style="margin-top:16px">
+        <button type="button" class="btn" id="mDoMerge" style="padding:10px 22px;font-size:14.5px">دمج المحدد (${selectedIds.size})</button>
+        <button type="button" class="btn sec" id="mCancel" style="padding:10px 18px;font-size:14.5px">إلغاء</button>
+      </div>`;
+
+    md.querySelector('#mmx').onclick = md.querySelector('#mCancel').onclick = closeModal;
+    md.querySelector('#mFilterCat').onchange = e => {
+      const keepName = md.querySelector('#mName').value;
+      mCat = e.target.value;
+      drawMerge();
+      md.querySelector('#mName').value = keepName;
+    };
+    md.querySelectorAll('[data-mpid]').forEach(chk => {
+      chk.onchange = () => {
+        const keepName = md.querySelector('#mName').value;
+        const keepTargetCat = md.querySelector('#mTargetCat').value;
+        if (chk.checked) selectedIds.add(chk.dataset.mpid);
+        else selectedIds.delete(chk.dataset.mpid);
+        drawMerge();
+        md.querySelector('#mName').value = keepName;
+        md.querySelector('#mTargetCat').value = keepTargetCat;
+      };
+    });
+
+    md.querySelector('#mDoMerge').onclick = () => {
+      if (selectedIds.size < 2) {
+        toast('اختاري منتجين على الأقل للدمج');
+        return;
+      }
+      const chosen = D.products.filter(p => selectedIds.has(p.id));
+      const baseName = (md.querySelector('#mName').value || '').trim() || chosen[0].name;
+      const targetCat = md.querySelector('#mTargetCat').value || chosen[0].category;
+
+      const mergedVariants = [];
+      const usedNames = new Set();
+      const pushUniqueVariant = vObj => {
+        let vName = (vObj.name || 'نوع').trim();
+        let counter = 2;
+        while (usedNames.has(vName)) {
+          vName = `${vObj.name.trim()} (${counter++})`;
+        }
+        usedNames.add(vName);
+        mergedVariants.push({ ...vObj, name: vName });
+      };
+
+      chosen.forEach(item => {
+        if (hasVar(item)) {
+          item.variants.forEach(v => {
+            const st = parseStock(v.stock);
+            pushUniqueVariant({
+              name: v.name || item.name,
+              price: +v.price || 0,
+              discount: clampDisc(v.discount || item.discount || 0),
+              stock: st,
+              description: (v.description || '').trim() || (item.description || '').trim(),
+              specs: (v.specs || '').trim() || (item.specs || '').trim(),
+              usage: (v.usage || '').trim() || (item.usage || '').trim(),
+              inStock: st !== null ? st > 0 : (v.inStock !== false),
+              image: v.image || item.image || ''
+            });
+          });
+        } else {
+          const st = parseStock(item.stock);
+          let cleanVarName = item.name.trim();
+          if (cleanVarName.startsWith(baseName + ' - ')) {
+            cleanVarName = cleanVarName.slice((baseName + ' - ').length).trim() || cleanVarName;
+          }
+          pushUniqueVariant({
+            name: cleanVarName,
+            price: +item.price || 0,
+            discount: clampDisc(item.discount || 0),
+            stock: st,
+            description: (item.description || '').trim(),
+            specs: (item.specs || '').trim(),
+            usage: (item.usage || '').trim(),
+            inStock: st !== null ? st > 0 : (item.inStock !== false),
+            image: item.image || ''
+          });
+        }
+      });
+
+      const firstImg = chosen.find(x => x.image)?.image || mergedVariants.find(v => v.image)?.image || '';
+      const mergedProduct = {
+        id: uid('p'),
+        name: baseName,
+        category: targetCat,
+        description: chosen[0].description || '',
+        specs: chosen[0].specs || '',
+        usage: chosen[0].usage || '',
+        image: firstImg,
+        price: 0,
+        discount: 0,
+        stock: null,
+        inStock: mergedVariants.some(v => isVarAvail(v)),
+        variants: mergedVariants
+      };
+
+      const firstIdx = D.products.findIndex(p => selectedIds.has(p.id));
+      D.products = D.products.filter(p => !selectedIds.has(p.id));
+      D.products.splice(Math.max(0, firstIdx), 0, mergedProduct);
+
+      setDirty(true);
+      closeModal();
+      render();
+      toast(`تم دمج ${chosen.length} منتجات في "${baseName}" ✓ — اضغطي "حفظ ونشر"`);
+    };
+  };
+
+  drawMerge();
+  $('#ov').classList.add('show');
 }
 
 function viewCategories() {
@@ -446,6 +625,62 @@ function editProduct(id) {
     });
   };
 
+  const buildStandaloneFromVariant = (v, idx = 0, includeBaseName = false) => {
+    const st = parseStock(v.stock);
+    const baseTitle = (p.name || '').trim();
+    const varTitle = (v.name || '').trim() || `منتج ${idx + 1}`;
+    const finalName = (includeBaseName && baseTitle && !varTitle.includes(baseTitle))
+      ? `${baseTitle} - ${varTitle}`
+      : varTitle;
+    return {
+      id: uid('p' + idx),
+      name: finalName,
+      category: p.category,
+      description: (v.description || '').trim() || (p.description || '').trim(),
+      specs: (v.specs || '').trim() || (p.specs || '').trim(),
+      usage: (v.usage || '').trim() || (p.usage || '').trim(),
+      image: v.image || p.image || '',
+      price: +v.price || 0,
+      discount: clampDisc(v.discount || p.discount || 0),
+      stock: st,
+      inStock: st !== null ? st > 0 : (v.inStock !== false),
+      variants: []
+    };
+  };
+
+  const splitSingleVariant = idx => {
+    sync();
+    const v = p.variants[idx];
+    if (!v) return;
+    const varTitle = (v.name || '').trim();
+    if (!varTitle) { toast('اكتبي اسم النوع أولاً قبل فصله'); return; }
+    const includeBase = confirm(
+      `فصل النوع "${varTitle}" إلى منتج مستقل؟\n\n` +
+      `• موافق = يصبح اسمه: "${(p.name || '').trim()} - ${varTitle}"\n` +
+      `• إلغاء = يصبح اسمه: "${varTitle}" فقط`
+    );
+    const standalone = buildStandaloneFromVariant(v, idx, includeBase);
+    p.variants.splice(idx, 1);
+
+    if (p.variants.length > 0) {
+      p.price = 0;
+      p.inStock = p.variants.some(item => isVarAvail(item));
+    }
+
+    const savedParent = JSON.parse(JSON.stringify(p));
+    const parentIdx = D.products.findIndex(x => x.id === savedParent.id);
+    if (parentIdx >= 0) {
+      D.products[parentIdx] = savedParent;
+      D.products.splice(parentIdx + 1, 0, standalone);
+    } else {
+      D.products.push(savedParent, standalone);
+    }
+
+    setDirty(true);
+    draw();
+    toast(`تم فصل "${standalone.name}" كمنتج مستقل ✓`);
+  };
+
   const splitVariantsToProducts = () => {
     sync();
     const validVars = p.variants.filter(v => (v.name || '').trim());
@@ -457,28 +692,7 @@ function editProduct(id) {
       `• إلغاء = استخدام اسم النوع فقط كاسم للمنتج المستقل`
     );
 
-    const newProducts = validVars.map((v, idx) => {
-      const st = parseStock(v.stock);
-      const baseTitle = (p.name || '').trim();
-      const varTitle = v.name.trim();
-      const finalName = (includeBaseName && baseTitle && !varTitle.includes(baseTitle))
-        ? `${baseTitle} - ${varTitle}`
-        : varTitle;
-      return {
-        id: uid('p' + idx),
-        name: finalName,
-        category: p.category,
-        description: (v.description || '').trim() || (p.description || '').trim(),
-        specs: (v.specs || '').trim() || (p.specs || '').trim(),
-        usage: (v.usage || '').trim() || (p.usage || '').trim(),
-        image: v.image || p.image || '',
-        price: +v.price || 0,
-        discount: clampDisc(v.discount || p.discount || 0),
-        stock: st,
-        inStock: st !== null ? st > 0 : (v.inStock !== false),
-        variants: []
-      };
-    });
+    const newProducts = validVars.map((v, idx) => buildStandaloneFromVariant(v, idx, includeBaseName));
 
     const existingIdx = D.products.findIndex(x => x.id === p.id);
     if (existingIdx >= 0) {
@@ -588,6 +802,7 @@ function editProduct(id) {
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                 <input type="file" data-vf="${i}" accept="image/*" style="max-width:210px;font-size:12px">
                 ${v.image ? `<button type="button" class="btn danger sm" data-vr="${i}">إزالة الصورة</button>` : ''}
+                <button type="button" class="btn sec sm" data-vone="${i}" style="background:#eef6ff;color:#1d4ed8;border:1px solid #bfdbfe" title="إخراج هذا النوع فقط كمنتج مستقل">↗ فصل لمنتج مستقل</button>
                 <button type="button" class="btn danger sm" data-vdel="${i}">×</button>
               </div>
             </div>
@@ -597,7 +812,7 @@ function editProduct(id) {
 
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
         <button type="button" class="btn sec" id="va">+ إضافة نوع</button>
-        ${p.variants.length > 0 ? `<button type="button" class="btn sec" id="vsplit" style="background:#eef6ff;color:#1d4ed8;border:1px solid #bfdbfe">↗ فصل كل نوع كمنتج مستقل</button>` : ''}
+        ${p.variants.length > 0 ? `<button type="button" class="btn sec" id="vsplit" style="background:#eef6ff;color:#1d4ed8;border:1px solid #bfdbfe">↗ فصل كل الأنواع كمنتجات مستقلة</button>` : ''}
       </div>
 
       <label for="fsp" style="margin-top:18px;font-size:14px">المواصفات العامة للمنتج (تظهر في الأسفل إذا لم يحدد للنوع)</label>
@@ -649,6 +864,7 @@ function editProduct(id) {
     md.querySelector('#va').onclick = () => { sync(); p.variants.push({ name: '', price: p.price || 0, discount: clampDisc(p.discount || 0), stock: null, description: '', specs: '', usage: '', inStock: true, image: '' }); draw(); };
     const splitBtn = md.querySelector('#vsplit');
     if (splitBtn) splitBtn.onclick = splitVariantsToProducts;
+    md.querySelectorAll('[data-vone]').forEach(b => b.onclick = () => splitSingleVariant(+b.dataset.vone));
     md.querySelectorAll('[data-vdel]').forEach(b => b.onclick = () => { sync(); p.variants.splice(+b.dataset.vdel, 1); draw(); });
     md.querySelectorAll('[data-vr]').forEach(b => b.onclick = () => { sync(); p.variants[+b.dataset.vr].image = ''; draw(); });
     md.querySelectorAll('[data-vf]').forEach(inp => {
