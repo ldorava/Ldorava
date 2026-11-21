@@ -20,7 +20,6 @@ try { stockDeducted = JSON.parse(localStorage.getItem('stock_deducted') || '{}')
 let cat = 'all', q = '';
 let modalHistoryPushed = false;
 let cartHistoryPushed = false;
-let shareHistoryPushed = false;
 
 const hasVariants = p => Array.isArray(p.variants) && p.variants.length > 0;
 const effectiveVarDisc = (p, v) => clampDisc(v.discount || p.discount || 0);
@@ -84,7 +83,6 @@ function pushOverlayState(kind) {
     history.pushState({ overlay: kind, _ts: Date.now() }, '');
     if (kind === 'product') modalHistoryPushed = true;
     if (kind === 'cart') cartHistoryPushed = true;
-    if (kind === 'share') shareHistoryPushed = true;
   } catch (e) {}
 }
 
@@ -99,17 +97,11 @@ function hideProductOverlay(fromPopstate = false) {
   }
 }
 
-function closeShareModal(fromPopstate = false) {
+function closeShareModal() {
   const ov = $('#shareOv');
   if (!ov) return;
-  const wasOpen = ov.classList.contains('show');
   ov.classList.remove('show');
-  if (!fromPopstate && wasOpen && shareHistoryPushed) {
-    shareHistoryPushed = false;
-    try { history.back(); } catch (e) {}
-  } else {
-    shareHistoryPushed = false;
-  }
+  ov.style.display = 'none';
 }
 
 function ensureShareModal() {
@@ -135,8 +127,8 @@ function ensureShareModal() {
     </div>`;
   document.body.appendChild(ov);
 
-  ov.onclick = e => { if (e.target.id === 'shareOv') closeShareModal(false); };
-  $('#closeShare').onclick = () => closeShareModal(false);
+  ov.onclick = e => { if (e.target.id === 'shareOv') closeShareModal(); };
+  $('#closeShare').onclick = () => closeShareModal();
 
   $('#copyLinkBtn').onclick = async () => {
     const st = $('#shareStatus');
@@ -182,16 +174,9 @@ function openShareModal() {
   ensureShareModal();
   const ov = $('#shareOv');
   $('#shareStatus').textContent = '';
-  const wasOpen = ov.classList.contains('show');
   ov.style.display = 'flex';
   ov.classList.add('show');
-  if (!wasOpen) pushOverlayState('share');
 }
-
-const origShareCloseWatcher = () => {
-  const ov = $('#shareOv');
-  if (ov && !ov.classList.contains('show')) ov.style.display = 'none';
-};
 
 function renderAboutSection() {
   if ($('#aboutVivaSection')) return;
@@ -207,7 +192,7 @@ function renderAboutSection() {
         </div>
         <h2 style="margin:0;font-size:1.45rem;color:#1f2937">L'DORA Viva — وكيل شركة L'DORA</h2>
         <p style="margin:0;color:#4b5563;font-size:14.5px;line-height:1.85">
-          نحن في <b>L'DORA Viva</b> وكيل معتمد لشركة <b>L'DORA</b>، نضع بين يديكِ عناية متكاملة تجمع بين الجودة العالية واللمسة العصرية لتمنحي جمالكِ إشراقة تدوم كل يوم. نحرص بعناية على اختيار منتجات أصلية وموثوقة تناسب مختلف الاحتياجات، مع تجربة تسوق سهلة وسريعة واستشارات مخصصة تساعدكِ في اختيار الأنسب لكِ بثقة وراحة بال.
+          نحن <b>L'DORA Viva</b> وكيل معتمد لشركة <b>L'DORA</b>، نضع بين يديكِ عناية متكاملة تجمع بين الجودة العالية واللمسة العصرية لتمنحي جمالكِ إشراقة تدوم كل يوم. نحرص بعناية على اختيار منتجات أصلية وموثوقة تناسب مختلف الاحتياجات، مع تجربة تسوق سهلة وسريعة واستشارات مخصصة تساعدكِ في اختيار الأنسب لكِ بثقة وراحة بال.
         </p>
         <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-top:8px;padding-top:14px;border-top:1px dashed rgba(0,0,0,.1)">
           <div style="font-size:13px;color:var(--muted)">${esc(shopName)} · وكيل شركة L'DORA</div>
@@ -230,9 +215,7 @@ function renderAboutSection() {
 
 window.addEventListener('popstate', () => {
   if ($('#shareOv') && $('#shareOv').classList.contains('show')) {
-    shareHistoryPushed = false;
-    closeShareModal(true);
-    origShareCloseWatcher();
+    closeShareModal();
     return;
   }
   if ($('#pov').classList.contains('show')) {
