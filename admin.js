@@ -5,6 +5,13 @@ const enc = s => btoa(unescape(encodeURIComponent(s)));
 const dec = b => decodeURIComponent(escape(atob(b.replace(/\n/g, ''))));
 const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 
+const clampDisc = d => Math.max(0, Math.min(99, Number(d) || 0));
+const discPrice = (price, disc) => {
+  const base = Number(price) || 0;
+  const pct = clampDisc(disc);
+  return pct > 0 ? Math.round(base * (1 - pct / 100)) : base;
+};
+
 let cfg = {};
 try { cfg = JSON.parse(localStorage.getItem('gh_cfg') || '{}'); } catch (e) {}
 let D = { settings: { name: 'المتجر', currency: '', whatsapp: '' }, categories: [], products: [] };
@@ -143,9 +150,20 @@ function render() {
 }
 
 const hasVar = p => Array.isArray(p.variants) && p.variants.length > 0;
-const priceText = p => hasVar(p)
-  ? `${p.variants.length} أنواع · من ${fmt(Math.min(...p.variants.map(v => +v.price || 0)))}`
-  : fmt(p.price);
+const effectiveVarDisc = (p, v) => clampDisc(v.discount || p.discount || 0);
+const priceText = p => {
+  const cur = D.settings.currency || '';
+  if (hasVar(p)) {
+    const finals = p.variants.map(v => discPrice(v.price, effectiveVarDisc(p, v)));
+    const anyDisc = p.variants.some(v => effectiveVarDisc(p, v) > 0);
+    return `${p.variants.length} أنواع · من ${fmt(Math.min(...finals))} ${cur}${anyDisc ? ' (خصم)' : ''}`;
+  }
+  const d = clampDisc(p.discount || 0);
+  if (d > 0) {
+    return `${fmt(discPrice(p.price, d))} ${cur} (بدلاً من ${fmt(p.price)} · خصم ${d}%)`;
+  }
+  return `${fmt(p.price)} ${cur}`;
+};
 
 function viewProducts() {
   const list = D.products.filter(p => filterCat === 'all' || p.category === filterCat);
@@ -162,7 +180,7 @@ function viewProducts() {
       const imgSrc = p.image || varImg || '';
       const th = imgSrc ? `<img src="${esc(previews[imgSrc] || imgSrc)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">` : (c?.icon || '🛍️');
       return `<div class="it"><div class="th" style="overflow:hidden">${th}</div>
-        <div class="n">${esc(p.name)}<small>${esc(c?.name || 'بدون قسم')} · ${priceText(p)} ${esc(D.settings.currency || '')}</small></div>
+        <div class="n">${esc(p.name)}<small>${esc(c?.name || 'بدون قسم')} · ${priceText(p)}</small></div>
         <button class="btn sec sm" data-e="${esc(p.id)}">تعديل</button>
         <button class="btn danger sm" data-d="${esc(p.id)}">حذف</button></div>`;
     }).join('') : '<div class="empty">لا توجد منتجات</div>'}</div></div>`;
@@ -235,16 +253,18 @@ function editProduct(id) {
   if (!D.categories.length) { toast('أضيفي قسماً أولاً من تبويب الأقسام'); return; }
   const isNew = !id;
   const p = isNew
-    ? { id: uid('p'), name: '', category: D.categories[0].id, description: '', specs: '', usage: '', image: '', price: 0, variants: [] }
+    ? { id: uid('p'), name: '', category: D.categories[0].id, description: '', specs: '', usage: '', image: '', price: 0, discount: 0, variants: [] }
     : JSON.parse(JSON.stringify(D.products.find(x => x.id === id)));
   p.specs = p.specs || '';
   p.usage = p.usage || '';
+  p.discount = clampDisc(p.discount || 0);
   p.variants = (p.variants || []).map(v => ({
     ...v,
     image: v.image || '',
     description: v.description || '',
     specs: v.specs || '',
-    usage: v.usage || ''
+    usage: v.usage || '',
+    discount: clampDisc(v.discount || 0)
   }));
 
   const md = $('#md');
@@ -262,8 +282,10 @@ function editProduct(id) {
     p.specs = $('#fsp').value;
     p.usage = $('#fus').value;
     p.price = +$('#fp').value || 0;
+    p.discount = clampDisc($('#fdisc').value || 0);
     md.querySelectorAll('[data-vn]').forEach(i => { if (p.variants[+i.dataset.vn]) p.variants[+i.dataset.vn].name = i.value; });
     md.querySelectorAll('[data-vp]').forEach(i => { if (p.variants[+i.dataset.vp]) p.variants[+i.dataset.vp].price = +i.value || 0; });
+    md.querySelectorAll('[data-vd]').forEach(i => { if (p.variants[+i.dataset.vd]) p.variants[+i.dataset.vd].discount = clampDisc(i.value || 0); });
     md.querySelectorAll('[data-vdsc]').forEach(i => { if (p.variants[+i.dataset.vdsc]) p.variants[+i.dataset.vdsc].description = i.value; });
     md.querySelectorAll('[data-vsp]').forEach(i => { if (p.variants[+i.dataset.vsp]) p.variants[+i.dataset.vsp].specs = i.value; });
     md.querySelectorAll('[data-vus]').forEach(i => { if (p.variants[+i.dataset.vus]) p.variants[+i.dataset.vus].usage = i.value; });
@@ -280,6 +302,7 @@ function editProduct(id) {
 
   const draw = () => {
     const mainSrc = p.image ? (previews[p.image] || p.image) : '';
+    const afterProdDisc = discPrice(p.price, p.discount);
     md.innerHTML = `<button class="x" id="mx">×</button>
       <h2 style="margin-top:0;color:var(--pink);font-size:1.45rem">${isNew ? 'منتج جديد' : 'تعديل المنتج'}</h2>
 
@@ -300,19 +323,36 @@ function editProduct(id) {
         ${p.image ? '<button type="button" class="btn danger sm" id="fr">إزالة</button>' : ''}
       </div>
 
-      <label for="fp" style="font-size:14px">السعر (يُستخدم إذا لم تكن هناك أنواع)</label>
-      <input type="number" id="fp" min="0" value="${p.price || 0}" style="font-size:15px;padding:11px 12px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:8px">
+        <div>
+          <label for="fp" style="font-size:14px">السعر (إذا لم تكن هناك أنواع)</label>
+          <input type="number" id="fp" min="0" value="${p.price || 0}" style="width:100%;box-sizing:border-box;font-size:15px;padding:11px 12px">
+        </div>
+        <div>
+          <label for="fdisc" style="font-size:14px">نسبة الخصم % (0 = بدون خصم)</label>
+          <input type="number" id="fdisc" min="0" max="99" value="${clampDisc(p.discount || 0)}" style="width:100%;box-sizing:border-box;font-size:15px;padding:11px 12px">
+        </div>
+      </div>
+      ${clampDisc(p.discount || 0) > 0 && !hasVar(p)
+        ? `<div style="margin-top:6px;font-size:13px;color:#157347;font-weight:600">السعر بعد الخصم: ${fmt(afterProdDisc)} ${esc(D.settings.currency || '')}</div>`
+        : ''}
 
-      <label style="margin-top:16px;font-size:14.5px">الأنواع (لكل نوع اسم، سعر، وصف، مواصفات، طريقة استعمال، وصورة)</label>
+      <label style="margin-top:16px;font-size:14.5px">الأنواع (لكل نوع اسم، سعر، خصم خاص اختياري، وصف، مواصفات، طريقة استعمال، وصورة)</label>
       <div id="vs" style="display:flex;flex-direction:column;gap:14px;margin-top:10px">
         ${p.variants.map((v, i) => {
           const vSrc = v.image ? (previews[v.image] || v.image) : '';
+          const effD = effectiveVarDisc(p, v);
+          const vFinal = discPrice(v.price, effD);
           return `<div style="border:1px solid rgba(0,0,0,.12);border-radius:14px;padding:14px;background:#fff;display:flex;flex-direction:column;gap:10px">
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
               ${thumbBox(vSrc, '🖼️', 48)}
-              <input type="text" data-vn="${i}" value="${esc(v.name)}" placeholder="اسم النوع" style="flex:1;min-width:180px;font-size:14.5px;padding:10px 12px">
-              <input type="number" data-vp="${i}" min="0" value="${v.price || 0}" placeholder="السعر" style="width:130px;font-size:14.5px;padding:10px 12px">
+              <input type="text" data-vn="${i}" value="${esc(v.name)}" placeholder="اسم النوع" style="flex:1;min-width:160px;font-size:14.5px;padding:10px 12px">
+              <input type="number" data-vp="${i}" min="0" value="${v.price || 0}" placeholder="السعر" style="width:120px;font-size:14.5px;padding:10px 12px">
+              <input type="number" data-vd="${i}" min="0" max="99" value="${clampDisc(v.discount || 0)}" placeholder="خصم %" title="نسبة الخصم % لهذا النوع (أو يأخذ خصم المنتج)" style="width:92px;font-size:14.5px;padding:10px 10px">
             </div>
+            ${effD > 0
+              ? `<div style="font-size:13px;color:#157347;font-weight:600">بعد الخصم (${effD}%): ${fmt(vFinal)} ${esc(D.settings.currency || '')}</div>`
+              : ''}
             <input type="text" data-vdsc="${i}" value="${esc(v.description || '')}" placeholder="وصف مختصر لهذا النوع..." style="width:100%;box-sizing:border-box;font-size:14px;padding:10px 12px">
             <textarea data-vsp="${i}" rows="3" placeholder="المواصفات الخاصة بهذا النوع..." style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.15);font-size:14px;line-height:1.6">${esc(v.specs || '')}</textarea>
             <textarea data-vus="${i}" rows="3" placeholder="طريقة الاستعمال الخاصة بهذا النوع..." style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.15);font-size:14px;line-height:1.6">${esc(v.usage || '')}</textarea>
@@ -323,7 +363,7 @@ function editProduct(id) {
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                 <input type="file" data-vf="${i}" accept="image/*" style="max-width:210px;font-size:12px">
                 ${v.image ? `<button type="button" class="btn danger sm" data-vr="${i}">إزالة الصورة</button>` : ''}
-                <button type="button" class="btn danger sm" data-vd="${i}">×</button>
+                <button type="button" class="btn danger sm" data-vdel="${i}">×</button>
               </div>
             </div>
           </div>`;
@@ -344,8 +384,12 @@ function editProduct(id) {
       </div>`;
 
     $('#mx').onclick = $('#fcn').onclick = closeModal;
-    $('#va').onclick = () => { sync(); p.variants.push({ name: '', price: p.price || 0, description: '', specs: '', usage: '', inStock: true, image: '' }); draw(); };
-    md.querySelectorAll('[data-vd]').forEach(b => b.onclick = () => { sync(); p.variants.splice(+b.dataset.vd, 1); draw(); });
+    $('#fdisc').oninput = () => { sync(); draw(); };
+    md.querySelectorAll('[data-vd], [data-vp]').forEach(inp => {
+      inp.oninput = () => { sync(); draw(); };
+    });
+    $('#va').onclick = () => { sync(); p.variants.push({ name: '', price: p.price || 0, discount: clampDisc(p.discount || 0), description: '', specs: '', usage: '', inStock: true, image: '' }); draw(); };
+    md.querySelectorAll('[data-vdel]').forEach(b => b.onclick = () => { sync(); p.variants.splice(+b.dataset.vdel, 1); draw(); });
     md.querySelectorAll('[data-vr]').forEach(b => b.onclick = () => { sync(); p.variants[+b.dataset.vr].image = ''; draw(); });
     md.querySelectorAll('[data-vf]').forEach(inp => {
       inp.onchange = async e => {
@@ -376,12 +420,14 @@ function editProduct(id) {
       p.description = (p.description || '').trim();
       p.specs = (p.specs || '').trim();
       p.usage = (p.usage || '').trim();
+      p.discount = clampDisc(p.discount || 0);
       if (!p.name) { toast('اكتبي اسم المنتج'); return; }
       p.variants = p.variants
         .filter(v => v.name.trim())
         .map(v => ({
           name: v.name.trim(),
           price: +v.price || 0,
+          discount: clampDisc(v.discount || 0),
           description: (v.description || '').trim(),
           specs: (v.specs || '').trim(),
           usage: (v.usage || '').trim(),
