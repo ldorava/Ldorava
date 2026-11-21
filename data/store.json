@@ -145,8 +145,8 @@
       "price": 75000,
       "variants": [],
       "discount": 0,
-      "stock": 0,
-      "inStock": false
+      "stock": null,
+      "inStock": true
     },
     {
       "id": "pmwox6oii0ti",
@@ -157,7 +157,10 @@
       "usage": "يُوصى برشّ العطر من مسافة 10 إلى 15 سنتيمتر على المعصم، المرفق، والعنق (طالما لا يسبب حساسية) لضمان ثبات أفضل وانتشار أوسع للرائحة.",
       "image": "images/1795199494322.jpg",
       "price": 75000,
-      "variants": []
+      "variants": [],
+      "discount": 0,
+      "stock": null,
+      "inStock": true
     },
     {
       "id": "pmwox7a68h8y",
@@ -168,7 +171,10 @@
       "usage": "",
       "image": "images/1795199608282.jpg",
       "price": 90000,
-      "variants": []
+      "variants": [],
+      "discount": 0,
+      "stock": null,
+      "inStock": true
     },
     {
       "id": "pmwox7wcg0ro",
