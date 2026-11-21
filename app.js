@@ -301,13 +301,28 @@ function reconcileDeductedCache() {
   }
 }
 
+function cleanFooter() {
+  if ($('#yr')) $('#yr').remove();
+  const footer = $('footer');
+  if (!footer) return;
+  const walker = document.createTreeWalker(footer, NodeFilter.SHOW_TEXT);
+  const toClean = [];
+  let node;
+  while ((node = walker.nextNode())) {
+    if (/[©—–-]/.test(node.nodeValue)) toClean.push(node);
+  }
+  toClean.forEach(n => {
+    n.nodeValue = n.nodeValue.replace(/[©—–-]/g, '').replace(/\s{2,}/g, ' ').trim();
+  });
+}
+
 async function init() {
   try { D = await (await fetch('data/store.json?' + Date.now())).json(); } catch (e) { console.error(e); }
   reconcileDeductedCache();
   const name = D.settings.name || "L'DORA Viva";
   $('#shopName').textContent = name;
   document.title = name;
-  if ($('#yr')) $('#yr').textContent = '';
+  cleanFooter();
   document.querySelectorAll('a[href*="admin"], button[data-admin], #adminBtn, #adminLink').forEach(el => el.remove());
   renderNav(); renderGrid(); renderCart(); renderAboutSection(); ensureScrollTopBtn();
 }
