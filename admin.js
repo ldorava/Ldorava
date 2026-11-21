@@ -446,6 +446,53 @@ function editProduct(id) {
     });
   };
 
+  const splitVariantsToProducts = () => {
+    sync();
+    const validVars = p.variants.filter(v => (v.name || '').trim());
+    if (!validVars.length) { toast('لا توجد أنواع صالحة للفصل'); return; }
+    const includeBaseName = confirm(
+      `سيتم تحويل (${validVars.length}) أنواع إلى منتجات مستقلة منفصلة.\n\n` +
+      `هل تريدين دمج اسم المنتج الأساسي "${p.name.trim()}" مع اسم كل نوع؟\n` +
+      `• موافق = الاسم يصبح: (اسم المنتج - اسم النوع)\n` +
+      `• إلغاء = استخدام اسم النوع فقط كاسم للمنتج المستقل`
+    );
+
+    const newProducts = validVars.map((v, idx) => {
+      const st = parseStock(v.stock);
+      const baseTitle = (p.name || '').trim();
+      const varTitle = v.name.trim();
+      const finalName = (includeBaseName && baseTitle && !varTitle.includes(baseTitle))
+        ? `${baseTitle} - ${varTitle}`
+        : varTitle;
+      return {
+        id: uid('p' + idx),
+        name: finalName,
+        category: p.category,
+        description: (v.description || '').trim() || (p.description || '').trim(),
+        specs: (v.specs || '').trim() || (p.specs || '').trim(),
+        usage: (v.usage || '').trim() || (p.usage || '').trim(),
+        image: v.image || p.image || '',
+        price: +v.price || 0,
+        discount: clampDisc(v.discount || p.discount || 0),
+        stock: st,
+        inStock: st !== null ? st > 0 : (v.inStock !== false),
+        variants: []
+      };
+    });
+
+    const existingIdx = D.products.findIndex(x => x.id === p.id);
+    if (existingIdx >= 0) {
+      D.products.splice(existingIdx, 1, ...newProducts);
+    } else {
+      D.products.push(...newProducts);
+    }
+
+    setDirty(true);
+    closeModal();
+    render();
+    toast(`تم فصل ${newProducts.length} منتجات مستقلة ✓ — اضغطي "حفظ ونشر"`);
+  };
+
   const thumbBox = (src, fallback, size = 48) => src
     ? `<div style="width:${size}px;height:${size}px;border-radius:10px;overflow:hidden;flex-shrink:0;border:1px solid rgba(0,0,0,.08);background:#fff;display:flex;align-items:center;justify-content:center">
          <img src="${esc(src)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">
@@ -548,7 +595,10 @@ function editProduct(id) {
         }).join('')}
       </div>
 
-      <button type="button" class="btn sec" id="va" style="margin-top:12px">+ إضافة نوع</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+        <button type="button" class="btn sec" id="va">+ إضافة نوع</button>
+        ${p.variants.length > 0 ? `<button type="button" class="btn sec" id="vsplit" style="background:#eef6ff;color:#1d4ed8;border:1px solid #bfdbfe">↗ فصل كل نوع كمنتج مستقل</button>` : ''}
+      </div>
 
       <label for="fsp" style="margin-top:18px;font-size:14px">المواصفات العامة للمنتج (تظهر في الأسفل إذا لم يحدد للنوع)</label>
       <textarea id="fsp" rows="4" style="width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:1px solid rgba(0,0,0,.15);font-size:14px;line-height:1.65" placeholder="مثال: الحجم 300 مل، مناسب للشعر العادي، خالٍ من السلفات...">${esc(p.specs || '')}</textarea>
@@ -597,6 +647,8 @@ function editProduct(id) {
       };
     });
     md.querySelector('#va').onclick = () => { sync(); p.variants.push({ name: '', price: p.price || 0, discount: clampDisc(p.discount || 0), stock: null, description: '', specs: '', usage: '', inStock: true, image: '' }); draw(); };
+    const splitBtn = md.querySelector('#vsplit');
+    if (splitBtn) splitBtn.onclick = splitVariantsToProducts;
     md.querySelectorAll('[data-vdel]').forEach(b => b.onclick = () => { sync(); p.variants.splice(+b.dataset.vdel, 1); draw(); });
     md.querySelectorAll('[data-vr]').forEach(b => b.onclick = () => { sync(); p.variants[+b.dataset.vr].image = ''; draw(); });
     md.querySelectorAll('[data-vf]').forEach(inp => {
