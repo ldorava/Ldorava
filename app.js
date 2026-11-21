@@ -20,6 +20,7 @@ try { stockDeducted = JSON.parse(localStorage.getItem('stock_deducted') || '{}')
 let cat = 'all', q = '';
 let modalHistoryPushed = false;
 let cartHistoryPushed = false;
+let shareHistoryPushed = false;
 
 const hasVariants = p => Array.isArray(p.variants) && p.variants.length > 0;
 const effectiveVarDisc = (p, v) => clampDisc(v.discount || p.discount || 0);
@@ -83,6 +84,7 @@ function pushOverlayState(kind) {
     history.pushState({ overlay: kind, _ts: Date.now() }, '');
     if (kind === 'product') modalHistoryPushed = true;
     if (kind === 'cart') cartHistoryPushed = true;
+    if (kind === 'share') shareHistoryPushed = true;
   } catch (e) {}
 }
 
@@ -97,11 +99,18 @@ function hideProductOverlay(fromPopstate = false) {
   }
 }
 
-function closeShareModal() {
+function closeShareModal(fromPopstate = false) {
   const ov = $('#shareOv');
   if (!ov) return;
+  const wasOpen = ov.classList.contains('show');
   ov.classList.remove('show');
   ov.style.display = 'none';
+  if (!fromPopstate && wasOpen && shareHistoryPushed) {
+    shareHistoryPushed = false;
+    try { history.back(); } catch (e) {}
+  } else {
+    shareHistoryPushed = false;
+  }
 }
 
 function ensureShareModal() {
@@ -126,7 +135,7 @@ function ensureShareModal() {
     </div>`;
   document.body.appendChild(ov);
 
-  ov.onclick = e => { if (e.target.id === 'shareOv') closeShareModal(); };
+  ov.onclick = e => { if (e.target.id === 'shareOv') closeShareModal(false); };
 
   $('#copyLinkBtn').onclick = async () => {
     const st = $('#shareStatus');
@@ -172,8 +181,10 @@ function openShareModal() {
   ensureShareModal();
   const ov = $('#shareOv');
   $('#shareStatus').textContent = '';
+  const wasOpen = ov.classList.contains('show');
   ov.style.display = 'flex';
   ov.classList.add('show');
+  if (!wasOpen) pushOverlayState('share');
 }
 
 function renderAboutSection() {
@@ -213,7 +224,8 @@ function renderAboutSection() {
 
 window.addEventListener('popstate', () => {
   if ($('#shareOv') && $('#shareOv').classList.contains('show')) {
-    closeShareModal();
+    shareHistoryPushed = false;
+    closeShareModal(true);
     return;
   }
   if ($('#pov').classList.contains('show')) {
