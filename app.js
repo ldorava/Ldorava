@@ -6,6 +6,8 @@ let D = { settings: {}, categories: [], products: [] };
 let cart = [];
 try { cart = JSON.parse(localStorage.getItem('cart') || '[]'); } catch (e) {}
 let cat = 'all', q = '';
+let modalHistoryPushed = false;
+let cartHistoryPushed = false;
 
 const hasVariants = p => Array.isArray(p.variants) && p.variants.length > 0;
 const minPrice = p => hasVariants(p) ? Math.min(...p.variants.map(v => +v.price || 0)) : (+p.price || 0);
@@ -24,6 +26,37 @@ const cardThumb = p => {
   }
   return thumb(p, null, 'cover');
 };
+
+function pushOverlayState(kind) {
+  try {
+    history.pushState({ overlay: kind, _ts: Date.now() }, '');
+    if (kind === 'product') modalHistoryPushed = true;
+    if (kind === 'cart') cartHistoryPushed = true;
+  } catch (e) {}
+}
+
+function hideProductOverlay(fromPopstate = false) {
+  const wasOpen = $('#pov').classList.contains('show');
+  $('#pov').classList.remove('show');
+  if (!fromPopstate && wasOpen && modalHistoryPushed) {
+    modalHistoryPushed = false;
+    try { history.back(); } catch (e) {}
+  } else {
+    modalHistoryPushed = false;
+  }
+}
+
+window.addEventListener('popstate', () => {
+  if ($('#pov').classList.contains('show')) {
+    modalHistoryPushed = false;
+    hideProductOverlay(true);
+    return;
+  }
+  if ($('#drawer').classList.contains('show')) {
+    cartHistoryPushed = false;
+    closeCart(true);
+  }
+});
 
 async function init() {
   try { D = await (await fetch('data/store.json?' + Date.now())).json(); } catch (e) { console.error(e); }
@@ -128,7 +161,7 @@ function openProduct(id) {
       </div>
       ${bottomInfoHtml}`;
 
-    $('#px').onclick = () => $('#pov').classList.remove('show');
+    $('#px').onclick = () => hideProductOverlay(false);
     $('#pmodal').querySelectorAll('.chip').forEach(c => c.onclick = () => {
       const i = +c.dataset.i;
       if (p.variants[i].inStock === false) return;
@@ -142,14 +175,18 @@ function openProduct(id) {
       const v = activeVariant ? activeVariant.name : '';
       const ex = cart.find(c => c.pid === p.id && c.v === v);
       ex ? ex.q += qty : cart.push({ pid: p.id, v, q: qty });
-      saveCart(); $('#pov').classList.remove('show'); openCart();
+      saveCart();
+      hideProductOverlay(false);
+      openCart();
     };
   };
 
   draw();
+  const wasOpen = $('#pov').classList.contains('show');
   $('#pov').classList.add('show');
+  if (!wasOpen) pushOverlayState('product');
 }
-$('#pov').onclick = e => { if (e.target.id === 'pov') $('#pov').classList.remove('show'); };
+$('#pov').onclick = e => { if (e.target.id === 'pov') hideProductOverlay(false); };
 
 function saveCart() { try { localStorage.setItem('cart', JSON.stringify(cart)); } catch (e) {} renderCart(); }
 
@@ -197,8 +234,25 @@ function renderCart() {
   };
 }
 
-function openCart() { $('#drawer').classList.add('show'); $('#cov').classList.add('show'); }
-function closeCart() { $('#drawer').classList.remove('show'); $('#cov').classList.remove('show'); }
-$('#cartBtn').onclick = openCart; $('#closeCart').onclick = closeCart; $('#cov').onclick = closeCart;
+function openCart() {
+  const wasOpen = $('#drawer').classList.contains('show');
+  $('#drawer').classList.add('show');
+  $('#cov').classList.add('show');
+  if (!wasOpen) pushOverlayState('cart');
+}
+function closeCart(fromPopstate = false) {
+  const wasOpen = $('#drawer').classList.contains('show');
+  $('#drawer').classList.remove('show');
+  $('#cov').classList.remove('show');
+  if (!fromPopstate && wasOpen && cartHistoryPushed) {
+    cartHistoryPushed = false;
+    try { history.back(); } catch (e) {}
+  } else {
+    cartHistoryPushed = false;
+  }
+}
+$('#cartBtn').onclick = openCart;
+$('#closeCart').onclick = () => closeCart(false);
+$('#cov').onclick = () => closeCart(false);
 
 init();
