@@ -3,6 +3,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const fmt = n => Number(n || 0).toLocaleString('en-US');
 
 const APP_SHARE_URL = 'https://ldorava.github.io/Ldorava/index.html';
+const LOW_STOCK_THRESHOLD = 3;
 
 const clampDisc = d => Math.max(0, Math.min(99, Number(d) || 0));
 const discPrice = (price, disc) => {
@@ -16,6 +17,8 @@ let cart = [];
 try { cart = JSON.parse(localStorage.getItem('cart') || '[]'); } catch (e) {}
 let stockDeducted = {};
 try { stockDeducted = JSON.parse(localStorage.getItem('stock_deducted') || '{}'); } catch (e) {}
+let orderNote = '';
+try { orderNote = localStorage.getItem('order_note') || ''; } catch (e) {}
 
 let cat = 'all', q = '';
 let modalHistoryPushed = false;
@@ -49,6 +52,23 @@ function isProductAvailable(p) {
   if (p.inStock === false) return false;
   const st = getEffectiveStock(p, null);
   return st === null || st > 0;
+}
+
+function getLowStockLabel(p) {
+  if (!isProductAvailable(p)) return '';
+  if (hasVariants(p)) {
+    const lowVars = p.variants.filter(v => {
+      if (!isVariantAvailable(p, v)) return false;
+      const st = getEffectiveStock(p, v);
+      return st !== null && st > 0 && st <= LOW_STOCK_THRESHOLD;
+    });
+    if (!lowVars.length) return '';
+    const minRem = Math.min(...lowVars.map(v => getEffectiveStock(p, v)));
+    return `باقي ${minRem} فقط`;
+  }
+  const st = getEffectiveStock(p, null);
+  if (st !== null && st > 0 && st <= LOW_STOCK_THRESHOLD) return `باقي ${st} فقط`;
+  return '';
 }
 
 const minPrice = p => {
@@ -187,6 +207,25 @@ function openShareModal() {
   if (!wasOpen) pushOverlayState('share');
 }
 
+function ensureScrollTopBtn() {
+  if ($('#goTopBtn')) return;
+  const btn = document.createElement('button');
+  btn.id = 'goTopBtn';
+  btn.type = 'button';
+  btn.title = 'العودة للأعلى';
+  btn.setAttribute('aria-label', 'العودة للأعلى');
+  btn.innerHTML = '↑';
+  btn.style.cssText = 'position:fixed;bottom:20px;left:18px;width:42px;height:42px;border-radius:50%;border:none;background:var(--pink,#d6336c);color:#fff;font-size:19px;font-weight:700;box-shadow:0 8px 22px rgba(0,0,0,.18);cursor:pointer;display:none;align-items:center;justify-content:center;z-index:990;transition:opacity .2s';
+  btn.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+  document.body.appendChild(btn);
+
+  const toggleTop = () => {
+    btn.style.display = window.scrollY > 360 ? 'flex' : 'none';
+  };
+  window.addEventListener('scroll', toggleTop, { passive: true });
+  toggleTop();
+}
+
 function renderAboutSection() {
   if ($('#aboutVivaSection')) return;
   const shopName = D.settings.name || "L'DORA Viva";
@@ -201,8 +240,13 @@ function renderAboutSection() {
         </div>
         <h2 style="margin:0;font-size:1.45rem;color:#1f2937">L'DORA Viva — وكيل شركة L'DORA</h2>
         <p style="margin:0;color:#4b5563;font-size:14.5px;line-height:1.85">
-          نحن في <b>L'DORA Viva</b> وكيل معتمد لشركة <b>L'DORA</b>، نضع بين يديكِ عناية متكاملة تجمع بين الجودة العالية واللمسة العصرية لتمنحي جمالكِ إشراقة تدوم كل يوم. نحرص بعناية على اختيار منتجات أصلية وموثوقة تناسب مختلف الاحتياجات، مع تجربة تسوق سهلة وسريعة واستشارات مخصصة تساعدكِ في اختيار الأنسب لكِ بثقة وراحة بال.
+          نحن <b>L'DORA Viva</b> وكيل معتمد لشركة <b>L'DORA</b>، نضع بين يديكِ عناية متكاملة تجمع بين الجودة العالية واللمسة العصرية لتمنحي جمالكِ إشراقة تدوم كل يوم. نحرص بعناية على اختيار منتجات أصلية وموثوقة تناسب مختلف الاحتياجات، مع تجربة تسوق سهلة وسريعة واستشارات مخصصة تساعدكِ في اختيار الأنسب لكِ بثقة وراحة بال.
         </p>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:2px">
+          <span style="background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:999px;padding:4px 12px;font-size:12.5px;color:#374151">💎 منتجات أصلية من L'DORA</span>
+          <span style="background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:999px;padding:4px 12px;font-size:12.5px;color:#374151">💬 استشارات مجانية</span>
+          <span style="background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:999px;padding:4px 12px;font-size:12.5px;color:#374151">✨ تنوع الأنواع والدرجات</span>
+        </div>
         <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-top:8px;padding-top:14px;border-top:1px dashed rgba(0,0,0,.1)">
           <div style="font-size:13px;color:var(--muted)">${esc(shopName)} · وكيل شركة L'DORA</div>
           <button type="button" class="btn" id="openShareAppBtn" style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:12px;font-size:14px">
@@ -265,7 +309,7 @@ async function init() {
   document.title = name;
   $('#yr').textContent = new Date().getFullYear();
   document.querySelectorAll('a[href*="admin"], button[data-admin], #adminBtn, #adminLink').forEach(el => el.remove());
-  renderNav(); renderGrid(); renderCart(); renderAboutSection();
+  renderNav(); renderGrid(); renderCart(); renderAboutSection(); ensureScrollTopBtn();
 }
 
 function renderNav() {
@@ -283,6 +327,7 @@ function renderGrid() {
   $('#grid').innerHTML = list.length ? list.map(p => {
     const available = isProductAvailable(p);
     const discounted = available && hasAnyDiscount(p);
+    const lowStockText = getLowStockLabel(p);
     const origMin = hasVariants(p) ? Math.min(...p.variants.map(v => +v.price || 0)) : (+p.price || 0);
     return `
     <div class="card" data-id="${esc(p.id)}" style="position:relative;${!available ? 'opacity:.78' : ''}">
@@ -298,7 +343,9 @@ function renderGrid() {
         </div>
         ${!available
           ? `<div class="tag" style="color:#c92a2a;font-weight:700">غير متوفر حالياً</div>`
-          : (hasVariants(p) ? `<div class="tag">${p.variants.length} أنواع</div>` : '')}
+          : (lowStockText
+              ? `<div class="tag" style="color:#b45309;font-weight:700">🔥 ${esc(lowStockText)}</div>`
+              : (hasVariants(p) ? `<div class="tag">${p.variants.length} أنواع</div>` : ''))}
       </div>
     </div>`;
   }).join('') : '<div class="empty" style="grid-column:1/-1">لا توجد منتجات</div>';
@@ -313,6 +360,16 @@ function openConsultWhatsApp(p, activeVariant) {
   const variantLine = activeVariant ? `\nالنوع: ${activeVariant.name}` : '';
   const msg = `مرحباً، أود الحصول على استشارة مجانية بخصوص المنتج:\nالمنتج: ${p.name}${variantLine}`;
   window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+function shareSingleProduct(p, activeVariant, finalPrice, cur) {
+  const vPart = activeVariant ? ` (${activeVariant.name})` : '';
+  const text = `${p.name}${vPart}\nالسعر: ${fmt(finalPrice)} ${cur}\n${APP_SHARE_URL}`;
+  if (navigator.share) {
+    navigator.share({ title: p.name, text, url: APP_SHARE_URL }).catch(() => {});
+    return;
+  }
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
 }
 
 function openProduct(id) {
@@ -389,7 +446,8 @@ function openProduct(id) {
     } else if (remainingToAdd === 0) {
       stockNoticeHtml = `<div style="margin:8px 0;padding:8px 12px;border-radius:10px;background:#fff8e6;color:#b45309;font-weight:700;font-size:13px;text-align:center">وصلتِ للحد الأقصى المتوفر في المخزن (في السلة: ${inCartQty})</div>`;
     } else if (maxStock !== null) {
-      stockNoticeHtml = `<div style="margin:6px 0;font-size:12.5px;color:#b45309;font-weight:600">المتوفر بالمخزن: ${maxStock}${inCartQty > 0 ? ` (في السلة: ${inCartQty} · المتاح إضافته: ${remainingToAdd})` : ''}</div>`;
+      const lowPrefix = maxStock <= LOW_STOCK_THRESHOLD ? '🔥 ' : '';
+      stockNoticeHtml = `<div style="margin:6px 0;font-size:12.5px;color:#b45309;font-weight:600">${lowPrefix}المتوفر بالمخزن: ${maxStock}${inCartQty > 0 ? ` (في السلة: ${inCartQty} · المتاح إضافته: ${remainingToAdd})` : ''}</div>`;
     }
 
     const addBtnLabel = !itemAvailable
@@ -418,7 +476,10 @@ function openProduct(id) {
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
         <button class="btn" id="add" style="width:100%" ${!canAddMore ? 'disabled' : ''}>${addBtnLabel}</button>
-        <button type="button" class="btn sec" id="consult" style="width:100%;background:#e8f8ee;color:#157347;border:1px solid #b7e4c7">💬 استشارة مجانية عبر واتساب</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn sec" id="consult" style="flex:1;min-width:150px;background:#e8f8ee;color:#157347;border:1px solid #b7e4c7">💬 استشارة واتساب</button>
+          <button type="button" class="btn sec" id="shareProd" style="flex:1;min-width:120px">📤 مشاركة المنتج</button>
+        </div>
       </div>
       ${bottomInfoHtml}`;
 
@@ -436,6 +497,7 @@ function openProduct(id) {
       draw();
     };
     $('#consult').onclick = () => openConsultWhatsApp(p, activeVariant);
+    $('#shareProd').onclick = () => shareSingleProduct(p, activeVariant, finalPrice, cur);
     $('#add').onclick = () => {
       if (!canAddMore) return;
       const v = activeVariant ? activeVariant.name : '';
@@ -459,6 +521,10 @@ function openProduct(id) {
 $('#pov').onclick = e => { if (e.target.id === 'pov') hideProductOverlay(false); };
 
 function saveCart() { try { localStorage.setItem('cart', JSON.stringify(cart)); } catch (e) {} renderCart(); }
+function saveOrderNote(val) {
+  orderNote = val;
+  try { localStorage.setItem('order_note', orderNote); } catch (e) {}
+}
 
 function resolve(c) {
   const p = D.products.find(x => x.id === c.pid);
@@ -502,7 +568,15 @@ function renderCart() {
       <div class="t" style="flex:1">${esc(r.p.name)}<small>${esc(c.v)}${c.v ? ' · ' : ''}${fmt(r.price)} ${esc(cur)}${r.disc > 0 ? ` (خصم ${r.disc}%)` : ''}${r.maxStock !== null ? ` · المتوفر: ${r.maxStock}` : ''}</small></div>
       <div class="qty"><button data-m="${i}">−</button><span>${c.q}</span><button data-p="${i}" ${r.maxStock !== null && c.q >= r.maxStock ? 'disabled' : ''}>+</button></div>
     </div>`;
-  }).join('');
+  }).join('') + `
+    <div style="margin-top:12px">
+      <label for="orderNoteInput" style="display:block;font-size:13px;color:var(--muted);margin-bottom:5px">العنوان أو ملاحظة للتوصيل (اختياري)</label>
+      <input type="text" id="orderNoteInput" value="${esc(orderNote)}" placeholder="مثال: البصرة - أبي الخصيب / قرب..." style="width:100%;box-sizing:border-box;padding:9px 11px;border-radius:10px;border:1px solid rgba(0,0,0,.15);font-size:13.5px">
+    </div>`;
+
+  const noteInp = $('#orderNoteInput');
+  if (noteInp) noteInp.oninput = e => saveOrderNote(e.target.value);
+
   $('#cartBody').querySelectorAll('[data-m]').forEach(b => b.onclick = () => { const c = cart[+b.dataset.m]; c.q--; if (c.q < 1) cart.splice(+b.dataset.m, 1); saveCart(); });
   $('#cartBody').querySelectorAll('[data-p]').forEach(b => b.onclick = () => {
     const c = cart[+b.dataset.p];
@@ -516,8 +590,13 @@ function renderCart() {
   $('#order').onclick = () => {
     const num = (D.settings.whatsapp || '').replace(/\D/g, '');
     if (!num) { alert('لم يتم ضبط رقم واتساب في لوحة الإدارة'); return; }
-    const lines = cart.map(c => { const r = resolve(c); return `• ${r.p.name}${c.v ? ' (' + c.v + ')' : ''} × ${c.q} = ${fmt(r.price * c.q)}`; });
-    const msg = `طلب جديد:\n${lines.join('\n')}\nالإجمالي: ${fmt(total)} ${cur}`;
+    const shopName = D.settings.name || "L'DORA Viva";
+    const lines = cart.map(c => {
+      const r = resolve(c);
+      return `• ${r.p.name}${c.v ? ' (' + c.v + ')' : ''} × ${c.q} = ${fmt(r.price * c.q)} ${cur}`;
+    });
+    const noteLine = orderNote.trim() ? `\nملاحظة / العنوان: ${orderNote.trim()}` : '';
+    const msg = `طلب جديد من ${shopName}:\n${lines.join('\n')}\nالإجمالي: ${fmt(total)} ${cur}${noteLine}`;
 
     cart.forEach(c => {
       const r = resolve(c);
@@ -527,6 +606,7 @@ function renderCart() {
     });
     try { localStorage.setItem('stock_deducted', JSON.stringify(stockDeducted)); } catch (e) {}
     cart = [];
+    saveOrderNote('');
     saveCart();
     renderGrid();
 
