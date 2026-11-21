@@ -112,7 +112,6 @@ function ensureShareModal() {
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=10&data=${encodeURIComponent(APP_SHARE_URL)}`;
   ov.innerHTML = `
     <div id="shareBox" style="position:relative;width:100%;max-width:390px;background:#fff;border-radius:20px;padding:24px 20px;box-shadow:0 20px 50px rgba(0,0,0,.22);text-align:center;box-sizing:border-box">
-      <button type="button" id="closeShare" aria-label="إغلاق" style="position:absolute;top:12px;left:12px;width:34px;height:34px;border-radius:50%;border:none;background:rgba(0,0,0,.06);font-size:20px;line-height:1;cursor:pointer">×</button>
       <h3 style="margin:0 0 6px;color:var(--pink);font-size:1.25rem">مشاركة التطبيق</h3>
       <p style="margin:0 0 14px;color:var(--muted);font-size:13.5px;line-height:1.6">امسحي الباركود بكاميرا الموبايل أو شاركي الرابط مباشرة مع من تحبين</p>
       <div style="display:inline-flex;align-items:center;justify-content:center;padding:10px;border:1px solid rgba(0,0,0,.08);border-radius:16px;background:#fafafa;margin-bottom:14px;min-height:220px;min-width:220px">
@@ -128,7 +127,6 @@ function ensureShareModal() {
   document.body.appendChild(ov);
 
   ov.onclick = e => { if (e.target.id === 'shareOv') closeShareModal(); };
-  $('#closeShare').onclick = () => closeShareModal();
 
   $('#copyLinkBtn').onclick = async () => {
     const st = $('#shareStatus');
@@ -192,7 +190,7 @@ function renderAboutSection() {
         </div>
         <h2 style="margin:0;font-size:1.45rem;color:#1f2937">L'DORA Viva — وكيل شركة L'DORA</h2>
         <p style="margin:0;color:#4b5563;font-size:14.5px;line-height:1.85">
-          نحن <b>L'DORA Viva</b> وكيل معتمد لشركة <b>L'DORA</b>، نضع بين يديكِ عناية متكاملة تجمع بين الجودة العالية واللمسة العصرية لتمنحي جمالكِ إشراقة تدوم كل يوم. نحرص بعناية على اختيار منتجات أصلية وموثوقة تناسب مختلف الاحتياجات، مع تجربة تسوق سهلة وسريعة واستشارات مخصصة تساعدكِ في اختيار الأنسب لكِ بثقة وراحة بال.
+          نحن في <b>L'DORA Viva</b> وكيل معتمد لشركة <b>L'DORA</b>، نضع بين يديكِ عناية متكاملة تجمع بين الجودة العالية واللمسة العصرية لتمنحي جمالكِ إشراقة تدوم كل يوم. نحرص بعناية على اختيار منتجات أصلية وموثوقة تناسب مختلف الاحتياجات، مع تجربة تسوق سهلة وسريعة واستشارات مخصصة تساعدكِ في اختيار الأنسب لكِ بثقة وراحة بال.
         </p>
         <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-top:8px;padding-top:14px;border-top:1px dashed rgba(0,0,0,.1)">
           <div style="font-size:13px;color:var(--muted)">${esc(shopName)} · وكيل شركة L'DORA</div>
