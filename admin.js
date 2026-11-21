@@ -61,7 +61,6 @@ async function loadData() {
 
 function normalizeProductsStockBeforeSave() {
   D.products = (D.products || []).map(prod => {
-    const pStock = parseStock(prod.stock);
     const vars = Array.isArray(prod.variants) ? prod.variants.map(vr => {
       const vStock = parseStock(vr.stock);
       return {
@@ -70,13 +69,22 @@ function normalizeProductsStockBeforeSave() {
         inStock: vStock !== null ? vStock > 0 : (vr.inStock !== false)
       };
     }) : [];
+
+    if (vars.length > 0) {
+      return {
+        ...prod,
+        price: 0,
+        variants: vars,
+        inStock: vars.some(vr => vr.stock !== null ? vr.stock > 0 : vr.inStock !== false)
+      };
+    }
+
+    const pStock = parseStock(prod.stock);
     return {
       ...prod,
       stock: pStock,
-      variants: vars,
-      inStock: vars.length
-        ? vars.some(vr => vr.stock !== null ? vr.stock > 0 : vr.inStock !== false)
-        : (pStock !== null ? pStock > 0 : (prod.inStock !== false))
+      variants: [],
+      inStock: pStock !== null ? pStock > 0 : (prod.inStock !== false)
     };
   });
 }
@@ -400,9 +408,14 @@ function editProduct(id) {
     p.usage = $('#fus').value;
     p.price = +$('#fp').value || 0;
     p.discount = clampDisc($('#fdisc').value || 0);
+
     if ($('#fstock')) {
       p.stock = parseStock($('#fstock').value);
-      p.inStock = p.stock !== null ? p.stock > 0 : ($('#finstock') ? $('#finstock').checked : true);
+      if (p.stock !== null) {
+        p.inStock = p.stock > 0;
+      } else if ($('#finstock')) {
+        p.inStock = $('#finstock').checked;
+      }
     }
 
     md.querySelectorAll('[data-vn]').forEach(i => { if (p.variants[+i.dataset.vn]) p.variants[+i.dataset.vn].name = i.value; });
@@ -438,6 +451,7 @@ function editProduct(id) {
   const draw = () => {
     const mainSrc = p.image ? (previews[p.image] || p.image) : '';
     const afterProdDisc = discPrice(p.price, p.discount);
+    const singleMode = p.variants.length === 0;
     const prodOut = p.stock !== null ? p.stock <= 0 : p.inStock === false;
     md.innerHTML = `<button class="x" id="mx">×</button>
       <h2 style="margin-top:0;color:var(--pink);font-size:1.45rem">${isNew ? 'منتج جديد' : 'تعديل المنتج'}</h2>
@@ -474,7 +488,7 @@ function editProduct(id) {
         </div>
       </div>
 
-      ${!hasVar(p) ? `
+      ${singleMode ? `
         <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
           <label style="margin:0;display:inline-flex;align-items:center;gap:6px;font-size:14px;cursor:pointer">
             <input type="checkbox" id="finstock" ${!prodOut ? 'checked' : ''}> متوفر للطلب
@@ -483,7 +497,7 @@ function editProduct(id) {
         </div>
       ` : '<input type="checkbox" id="finstock" checked style="display:none">'}
 
-      ${clampDisc(p.discount || 0) > 0 && !hasVar(p)
+      ${clampDisc(p.discount || 0) > 0 && singleMode
         ? `<div style="margin-top:6px;font-size:13px;color:#157347;font-weight:600">السعر بعد الخصم: ${fmt(afterProdDisc)} ${esc(D.settings.currency || '')}</div>`
         : ''}
 
@@ -543,7 +557,19 @@ function editProduct(id) {
 
     $('#mx').onclick = $('#fcn').onclick = closeModal;
     $('#fdisc').onchange = () => { sync(); draw(); };
-    if ($('#finstock')) $('#finstock').onchange = () => { sync(); draw(); };
+    if ($('#finstock')) {
+      $('#finstock').onchange = () => {
+        if (!$('#finstock').checked) {
+          p.stock = 0;
+          p.inStock = false;
+        } else {
+          if (p.stock === 0) p.stock = 1;
+          p.inStock = true;
+        }
+        sync();
+        draw();
+      };
+    }
     md.querySelectorAll('[data-vd], [data-vp]').forEach(inp => {
       inp.onchange = () => { sync(); draw(); };
     });
@@ -591,18 +617,16 @@ function editProduct(id) {
     };
     $('#fs').onclick = () => {
       sync();
-      p.name = p.name.trim();
+      p.name = (p.name || '').trim();
       p.description = (p.description || '').trim();
       p.specs = (p.specs || '').trim();
       p.usage = (p.usage || '').trim();
       p.discount = clampDisc(p.discount || 0);
-      p.stock = $('#fstock') ? parseStock($('#fstock').value) : parseStock(p.stock);
-      p.inStock = p.stock !== null ? p.stock > 0 : (p.inStock !== false);
       if (!p.name) { toast('اكتبي اسم المنتج'); return; }
 
       const stockInputs = [...md.querySelectorAll('[data-vst]')];
       p.variants = p.variants
-        .filter(v => v.name.trim())
+        .filter(v => (v.name || '').trim())
         .map((v, idx) => {
           const matchedInp = stockInputs.find(el => +el.dataset.vst === idx);
           const st = matchedInp ? parseStock(matchedInp.value) : parseStock(v.stock);
@@ -620,14 +644,24 @@ function editProduct(id) {
         });
       const names = p.variants.map(v => v.name);
       if (new Set(names).size !== names.length) { toast('أسماء الأنواع يجب ألا تتكرر'); return; }
-      if (p.variants.length) {
+
+      if (p.variants.length > 0) {
         p.price = 0;
         p.inStock = p.variants.some(v => isVarAvail(v));
+      } else {
+        const mainInp = $('#fstock');
+        p.stock = mainInp ? parseStock(mainInp.value) : parseStock(p.stock);
+        p.inStock = p.stock !== null ? p.stock > 0 : ($('#finstock') ? $('#finstock').checked : true);
       }
+
       const savedObj = JSON.parse(JSON.stringify(p));
       const i = D.products.findIndex(x => x.id === savedObj.id);
-      i >= 0 ? D.products[i] = savedObj : D.products.push(savedObj);
-      setDirty(true); closeModal(); render();
+      if (i >= 0) D.products[i] = savedObj;
+      else D.products.push(savedObj);
+
+      setDirty(true);
+      closeModal();
+      render();
     };
   };
   draw(); $('#ov').classList.add('show');
