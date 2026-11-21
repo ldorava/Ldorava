@@ -307,7 +307,7 @@ async function init() {
   const name = D.settings.name || "L'DORA Viva";
   $('#shopName').textContent = name;
   document.title = name;
-  $('#yr').textContent = new Date().getFullYear();
+  if ($('#yr')) $('#yr').textContent = '';
   document.querySelectorAll('a[href*="admin"], button[data-admin], #adminBtn, #adminLink').forEach(el => el.remove());
   renderNav(); renderGrid(); renderCart(); renderAboutSection(); ensureScrollTopBtn();
 }
