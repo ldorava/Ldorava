@@ -399,22 +399,28 @@ function editProduct(id) {
   md.style.padding = '22px';
   md.style.overflowY = 'auto';
 
-  const sync = () => {
-    if (!$('#fn')) return;
-    p.name = $('#fn').value;
-    p.category = $('#fc').value;
-    p.description = $('#fd').value;
-    p.specs = $('#fsp').value;
-    p.usage = $('#fus').value;
-    p.price = +$('#fp').value || 0;
-    p.discount = clampDisc($('#fdisc').value || 0);
+  const getMainStockEl = () => md.querySelector('#fstock');
+  const getMainInStockEl = () => md.querySelector('#finstock');
 
-    if ($('#fstock')) {
-      p.stock = parseStock($('#fstock').value);
+  const sync = () => {
+    const nameEl = md.querySelector('#fn');
+    if (!nameEl) return;
+    p.name = nameEl.value;
+    p.category = md.querySelector('#fc').value;
+    p.description = md.querySelector('#fd').value;
+    p.specs = md.querySelector('#fsp').value;
+    p.usage = md.querySelector('#fus').value;
+    p.price = +md.querySelector('#fp').value || 0;
+    p.discount = clampDisc(md.querySelector('#fdisc').value || 0);
+
+    const stEl = getMainStockEl();
+    const inEl = getMainInStockEl();
+    if (stEl) {
+      p.stock = parseStock(stEl.value);
       if (p.stock !== null) {
         p.inStock = p.stock > 0;
-      } else if ($('#finstock')) {
-        p.inStock = $('#finstock').checked;
+      } else if (inEl) {
+        p.inStock = inEl.checked;
       }
     }
 
@@ -555,11 +561,12 @@ function editProduct(id) {
         <button type="button" class="btn sec" id="fcn" style="padding:10px 20px;font-size:15px">إلغاء</button>
       </div>`;
 
-    $('#mx').onclick = $('#fcn').onclick = closeModal;
-    $('#fdisc').onchange = () => { sync(); draw(); };
-    if ($('#finstock')) {
-      $('#finstock').onchange = () => {
-        if (!$('#finstock').checked) {
+    md.querySelector('#mx').onclick = md.querySelector('#fcn').onclick = closeModal;
+    md.querySelector('#fdisc').onchange = () => { sync(); draw(); };
+    const inStockBox = getMainInStockEl();
+    if (inStockBox) {
+      inStockBox.onchange = () => {
+        if (!inStockBox.checked) {
           p.stock = 0;
           p.inStock = false;
         } else {
@@ -589,7 +596,7 @@ function editProduct(id) {
         draw();
       };
     });
-    $('#va').onclick = () => { sync(); p.variants.push({ name: '', price: p.price || 0, discount: clampDisc(p.discount || 0), stock: null, description: '', specs: '', usage: '', inStock: true, image: '' }); draw(); };
+    md.querySelector('#va').onclick = () => { sync(); p.variants.push({ name: '', price: p.price || 0, discount: clampDisc(p.discount || 0), stock: null, description: '', specs: '', usage: '', inStock: true, image: '' }); draw(); };
     md.querySelectorAll('[data-vdel]').forEach(b => b.onclick = () => { sync(); p.variants.splice(+b.dataset.vdel, 1); draw(); });
     md.querySelectorAll('[data-vr]').forEach(b => b.onclick = () => { sync(); p.variants[+b.dataset.vr].image = ''; draw(); });
     md.querySelectorAll('[data-vf]').forEach(inp => {
@@ -607,15 +614,16 @@ function editProduct(id) {
         draw();
       };
     });
-    if ($('#fr')) $('#fr').onclick = () => { sync(); p.image = ''; draw(); };
-    $('#ff').onchange = async e => {
+    const remImgBtn = md.querySelector('#fr');
+    if (remImgBtn) remImgBtn.onclick = () => { sync(); p.image = ''; draw(); };
+    md.querySelector('#ff').onchange = async e => {
       const f = e.target.files[0]; if (!f) return;
       sync(); toast('جاري رفع الصورة...');
       try { p.image = await uploadImage(f); toast('تم رفع الصورة ✓'); }
       catch (err) { toast('فشل رفع الصورة: ' + err.message); }
       draw();
     };
-    $('#fs').onclick = () => {
+    md.querySelector('#fs').onclick = () => {
       sync();
       p.name = (p.name || '').trim();
       p.description = (p.description || '').trim();
@@ -649,9 +657,10 @@ function editProduct(id) {
         p.price = 0;
         p.inStock = p.variants.some(v => isVarAvail(v));
       } else {
-        const mainInp = $('#fstock');
+        const mainInp = getMainStockEl();
+        const mainInBox = getMainInStockEl();
         p.stock = mainInp ? parseStock(mainInp.value) : parseStock(p.stock);
-        p.inStock = p.stock !== null ? p.stock > 0 : ($('#finstock') ? $('#finstock').checked : true);
+        p.inStock = p.stock !== null ? p.stock > 0 : (mainInBox ? mainInBox.checked : true);
       }
 
       const savedObj = JSON.parse(JSON.stringify(p));
@@ -662,6 +671,7 @@ function editProduct(id) {
       setDirty(true);
       closeModal();
       render();
+      toast('تم تحديث المنتج في القائمة — اضغطي "حفظ ونشر" لتثبيته');
     };
   };
   draw(); $('#ov').classList.add('show');
