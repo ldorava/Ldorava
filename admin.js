@@ -11,12 +11,13 @@ const discPrice = (price, disc) => {
   const pct = clampDisc(disc);
   return pct > 0 ? Math.round(base * (1 - pct / 100)) : base;
 };
+const parseStock = val => (val === '' || val === null || val === undefined) ? null : Math.max(0, Math.floor(Number(val) || 0));
 
 let cfg = {};
 try { cfg = JSON.parse(localStorage.getItem('gh_cfg') || '{}'); } catch (e) {}
 let D = { settings: { name: 'المتجر', currency: '', whatsapp: '' }, categories: [], products: [] };
 let sha = null, dirty = false, tab = 'products', filterCat = 'all';
-const previews = {}; // مسار الصورة -> رابط معاينة محلي لحين نشر الموقع
+const previews = {};
 
 function toast(m) {
   const t = $('#toast'); t.textContent = m; t.style.display = 'block';
@@ -151,18 +152,37 @@ function render() {
 
 const hasVar = p => Array.isArray(p.variants) && p.variants.length > 0;
 const effectiveVarDisc = (p, v) => clampDisc(v.discount || p.discount || 0);
+const isVarAvail = v => v.inStock !== false && (v.stock === null || v.stock === undefined || Number(v.stock) > 0);
+const isProdAvail = p => hasVar(p)
+  ? p.variants.some(isVarAvail)
+  : (p.inStock !== false && (p.stock === null || p.stock === undefined || Number(p.stock) > 0));
+
+const stockBadge = p => {
+  if (!isProdAvail(p)) return ' · <span style="color:#c92a2a;font-weight:700">غير متوفر</span>';
+  if (hasVar(p)) {
+    const tracked = p.variants.filter(v => v.stock !== null && v.stock !== undefined);
+    if (tracked.length) {
+      const sum = tracked.reduce((a, v) => a + (Number(v.stock) || 0), 0);
+      return ` · المتبقي: ${sum}`;
+    }
+    return '';
+  }
+  if (p.stock !== null && p.stock !== undefined) return ` · الكمية: ${p.stock}`;
+  return '';
+};
+
 const priceText = p => {
   const cur = D.settings.currency || '';
   if (hasVar(p)) {
     const finals = p.variants.map(v => discPrice(v.price, effectiveVarDisc(p, v)));
     const anyDisc = p.variants.some(v => effectiveVarDisc(p, v) > 0);
-    return `${p.variants.length} أنواع · من ${fmt(Math.min(...finals))} ${cur}${anyDisc ? ' (خصم)' : ''}`;
+    return `${p.variants.length} أنواع · من ${fmt(Math.min(...finals))} ${cur}${anyDisc ? ' (خصم)' : ''}${stockBadge(p)}`;
   }
   const d = clampDisc(p.discount || 0);
   if (d > 0) {
-    return `${fmt(discPrice(p.price, d))} ${cur} (بدلاً من ${fmt(p.price)} · خصم ${d}%)`;
+    return `${fmt(discPrice(p.price, d))} ${cur} (خصم ${d}%)${stockBadge(p)}`;
   }
-  return `${fmt(p.price)} ${cur}`;
+  return `${fmt(p.price)} ${cur}${stockBadge(p)}`;
 };
 
 function viewProducts() {
@@ -253,19 +273,26 @@ function editProduct(id) {
   if (!D.categories.length) { toast('أضيفي قسماً أولاً من تبويب الأقسام'); return; }
   const isNew = !id;
   const p = isNew
-    ? { id: uid('p'), name: '', category: D.categories[0].id, description: '', specs: '', usage: '', image: '', price: 0, discount: 0, variants: [] }
+    ? { id: uid('p'), name: '', category: D.categories[0].id, description: '', specs: '', usage: '', image: '', price: 0, discount: 0, stock: null, inStock: true, variants: [] }
     : JSON.parse(JSON.stringify(D.products.find(x => x.id === id)));
   p.specs = p.specs || '';
   p.usage = p.usage || '';
   p.discount = clampDisc(p.discount || 0);
-  p.variants = (p.variants || []).map(v => ({
-    ...v,
-    image: v.image || '',
-    description: v.description || '',
-    specs: v.specs || '',
-    usage: v.usage || '',
-    discount: clampDisc(v.discount || 0)
-  }));
+  p.stock = parseStock(p.stock);
+  p.inStock = p.inStock !== false && (p.stock === null || p.stock > 0);
+  p.variants = (p.variants || []).map(v => {
+    const st = parseStock(v.stock);
+    return {
+      ...v,
+      image: v.image || '',
+      description: v.description || '',
+      specs: v.specs || '',
+      usage: v.usage || '',
+      discount: clampDisc(v.discount || 0),
+      stock: st,
+      inStock: v.inStock !== false && (st === null || st > 0)
+    };
+  });
 
   const md = $('#md');
   md.style.maxWidth = '960px';
@@ -283,13 +310,30 @@ function editProduct(id) {
     p.usage = $('#fus').value;
     p.price = +$('#fp').value || 0;
     p.discount = clampDisc($('#fdisc').value || 0);
+    p.stock = parseStock($('#fstock').value);
+    p.inStock = p.stock !== null ? p.stock > 0 : $('#finstock').checked;
+
     md.querySelectorAll('[data-vn]').forEach(i => { if (p.variants[+i.dataset.vn]) p.variants[+i.dataset.vn].name = i.value; });
     md.querySelectorAll('[data-vp]').forEach(i => { if (p.variants[+i.dataset.vp]) p.variants[+i.dataset.vp].price = +i.value || 0; });
     md.querySelectorAll('[data-vd]').forEach(i => { if (p.variants[+i.dataset.vd]) p.variants[+i.dataset.vd].discount = clampDisc(i.value || 0); });
+    md.querySelectorAll('[data-vst]').forEach(i => {
+      const v = p.variants[+i.dataset.vst];
+      if (v) {
+        v.stock = parseStock(i.value);
+        if (v.stock !== null) v.inStock = v.stock > 0;
+      }
+    });
     md.querySelectorAll('[data-vdsc]').forEach(i => { if (p.variants[+i.dataset.vdsc]) p.variants[+i.dataset.vdsc].description = i.value; });
     md.querySelectorAll('[data-vsp]').forEach(i => { if (p.variants[+i.dataset.vsp]) p.variants[+i.dataset.vsp].specs = i.value; });
     md.querySelectorAll('[data-vus]').forEach(i => { if (p.variants[+i.dataset.vus]) p.variants[+i.dataset.vus].usage = i.value; });
-    md.querySelectorAll('[data-vs]').forEach(i => { if (p.variants[+i.dataset.vs]) p.variants[+i.dataset.vs].inStock = i.checked; });
+    md.querySelectorAll('[data-vs]').forEach(i => {
+      const v = p.variants[+i.dataset.vs];
+      if (v) {
+        v.inStock = i.checked;
+        if (!v.inStock && v.stock !== null && v.stock > 0) v.stock = 0;
+        if (v.inStock && v.stock === 0) v.stock = 1;
+      }
+    });
   };
 
   const thumbBox = (src, fallback, size = 48) => src
@@ -303,6 +347,7 @@ function editProduct(id) {
   const draw = () => {
     const mainSrc = p.image ? (previews[p.image] || p.image) : '';
     const afterProdDisc = discPrice(p.price, p.discount);
+    const prodOut = p.stock !== null ? p.stock <= 0 : p.inStock === false;
     md.innerHTML = `<button class="x" id="mx">×</button>
       <h2 style="margin-top:0;color:var(--pink);font-size:1.45rem">${isNew ? 'منتج جديد' : 'تعديل المنتج'}</h2>
 
@@ -323,42 +368,63 @@ function editProduct(id) {
         ${p.image ? '<button type="button" class="btn danger sm" id="fr">إزالة</button>' : ''}
       </div>
 
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:8px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:8px">
         <div>
-          <label for="fp" style="font-size:14px">السعر (إذا لم تكن هناك أنواع)</label>
+          <label for="fp" style="font-size:14px">السعر (بدون أنواع)</label>
           <input type="number" id="fp" min="0" value="${p.price || 0}" style="width:100%;box-sizing:border-box;font-size:15px;padding:11px 12px">
         </div>
         <div>
-          <label for="fdisc" style="font-size:14px">نسبة الخصم % (0 = بدون خصم)</label>
+          <label for="fdisc" style="font-size:14px">نسبة الخصم %</label>
           <input type="number" id="fdisc" min="0" max="99" value="${clampDisc(p.discount || 0)}" style="width:100%;box-sizing:border-box;font-size:15px;padding:11px 12px">
         </div>
+        <div>
+          <label for="fstock" style="font-size:14px">الكمية المتوفرة (اتركيها فارغة = مفتوح)</label>
+          <input type="number" id="fstock" min="0" value="${p.stock !== null ? p.stock : ''}" placeholder="مثال: 10" style="width:100%;box-sizing:border-box;font-size:15px;padding:11px 12px">
+        </div>
       </div>
+
+      ${!hasVar(p) ? `
+        <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <label style="margin:0;display:inline-flex;align-items:center;gap:6px;font-size:14px;cursor:pointer">
+            <input type="checkbox" id="finstock" ${!prodOut ? 'checked' : ''}> متوفر للطلب
+          </label>
+          ${prodOut ? '<span style="color:#c92a2a;font-size:13px;font-weight:700">سيظهر في المتجر: غير متوفر</span>' : ''}
+        </div>
+      ` : '<input type="checkbox" id="finstock" checked style="display:none">'}
+
       ${clampDisc(p.discount || 0) > 0 && !hasVar(p)
         ? `<div style="margin-top:6px;font-size:13px;color:#157347;font-weight:600">السعر بعد الخصم: ${fmt(afterProdDisc)} ${esc(D.settings.currency || '')}</div>`
         : ''}
 
-      <label style="margin-top:16px;font-size:14.5px">الأنواع (لكل نوع اسم، سعر، خصم خاص اختياري، وصف، مواصفات، طريقة استعمال، وصورة)</label>
+      <label style="margin-top:16px;font-size:14.5px">الأنواع (لكل نوع اسم، سعر، خصم %، الكمية بالمخزون، وصف، مواصفات، طريقة استعمال، وصورة)</label>
       <div id="vs" style="display:flex;flex-direction:column;gap:14px;margin-top:10px">
         ${p.variants.map((v, i) => {
           const vSrc = v.image ? (previews[v.image] || v.image) : '';
           const effD = effectiveVarDisc(p, v);
           const vFinal = discPrice(v.price, effD);
-          return `<div style="border:1px solid rgba(0,0,0,.12);border-radius:14px;padding:14px;background:#fff;display:flex;flex-direction:column;gap:10px">
+          const vOut = v.stock !== null ? v.stock <= 0 : v.inStock === false;
+          return `<div style="border:1px solid ${vOut ? 'rgba(201,42,42,.35)' : 'rgba(0,0,0,.12)'};border-radius:14px;padding:14px;background:${vOut ? '#fff8f8' : '#fff'};display:flex;flex-direction:column;gap:10px">
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
               ${thumbBox(vSrc, '🖼️', 48)}
-              <input type="text" data-vn="${i}" value="${esc(v.name)}" placeholder="اسم النوع" style="flex:1;min-width:160px;font-size:14.5px;padding:10px 12px">
-              <input type="number" data-vp="${i}" min="0" value="${v.price || 0}" placeholder="السعر" style="width:120px;font-size:14.5px;padding:10px 12px">
-              <input type="number" data-vd="${i}" min="0" max="99" value="${clampDisc(v.discount || 0)}" placeholder="خصم %" title="نسبة الخصم % لهذا النوع (أو يأخذ خصم المنتج)" style="width:92px;font-size:14.5px;padding:10px 10px">
+              <input type="text" data-vn="${i}" value="${esc(v.name)}" placeholder="اسم النوع" style="flex:1;min-width:150px;font-size:14.5px;padding:10px 12px">
+              <input type="number" data-vp="${i}" min="0" value="${v.price || 0}" placeholder="السعر" title="السعر" style="width:110px;font-size:14.5px;padding:10px 10px">
+              <input type="number" data-vd="${i}" min="0" max="99" value="${clampDisc(v.discount || 0)}" placeholder="خصم %" title="نسبة الخصم %" style="width:86px;font-size:14.5px;padding:10px 8px">
+              <input type="number" data-vst="${i}" min="0" value="${v.stock !== null ? v.stock : ''}" placeholder="الكمية" title="الكمية المتوفرة (0 = غير متوفر)" style="width:94px;font-size:14.5px;padding:10px 8px">
             </div>
-            ${effD > 0
-              ? `<div style="font-size:13px;color:#157347;font-weight:600">بعد الخصم (${effD}%): ${fmt(vFinal)} ${esc(D.settings.currency || '')}</div>`
-              : ''}
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+              ${effD > 0
+                ? `<div style="font-size:13px;color:#157347;font-weight:600">بعد الخصم (${effD}%): ${fmt(vFinal)} ${esc(D.settings.currency || '')}</div>`
+                : '<div></div>'}
+              ${vOut
+                ? '<div style="font-size:13px;color:#c92a2a;font-weight:700">غير متوفر (نفدت الكمية)</div>'
+                : (v.stock !== null ? `<div style="font-size:13px;color:#495057">المتبقي بالمخزون: <b>${v.stock}</b></div>` : '')}
+            </div>
             <input type="text" data-vdsc="${i}" value="${esc(v.description || '')}" placeholder="وصف مختصر لهذا النوع..." style="width:100%;box-sizing:border-box;font-size:14px;padding:10px 12px">
             <textarea data-vsp="${i}" rows="3" placeholder="المواصفات الخاصة بهذا النوع..." style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.15);font-size:14px;line-height:1.6">${esc(v.specs || '')}</textarea>
             <textarea data-vus="${i}" rows="3" placeholder="طريقة الاستعمال الخاصة بهذا النوع..." style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.15);font-size:14px;line-height:1.6">${esc(v.usage || '')}</textarea>
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding-top:8px;border-top:1px dashed rgba(0,0,0,.08)">
               <label style="margin:0;display:inline-flex;align-items:center;gap:6px;font-size:14px;cursor:pointer">
-                <input type="checkbox" data-vs="${i}" ${v.inStock !== false ? 'checked' : ''}> متوفر
+                <input type="checkbox" data-vs="${i}" ${!vOut ? 'checked' : ''}> متوفر
               </label>
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                 <input type="file" data-vf="${i}" accept="image/*" style="max-width:210px;font-size:12px">
@@ -385,10 +451,15 @@ function editProduct(id) {
 
     $('#mx').onclick = $('#fcn').onclick = closeModal;
     $('#fdisc').oninput = () => { sync(); draw(); };
+    $('#fstock').onchange = () => { sync(); draw(); };
+    if ($('#finstock')) $('#finstock').onchange = () => { sync(); draw(); };
     md.querySelectorAll('[data-vd], [data-vp]').forEach(inp => {
       inp.oninput = () => { sync(); draw(); };
     });
-    $('#va').onclick = () => { sync(); p.variants.push({ name: '', price: p.price || 0, discount: clampDisc(p.discount || 0), description: '', specs: '', usage: '', inStock: true, image: '' }); draw(); };
+    md.querySelectorAll('[data-vst], [data-vs]').forEach(inp => {
+      inp.onchange = () => { sync(); draw(); };
+    });
+    $('#va').onclick = () => { sync(); p.variants.push({ name: '', price: p.price || 0, discount: clampDisc(p.discount || 0), stock: null, description: '', specs: '', usage: '', inStock: true, image: '' }); draw(); };
     md.querySelectorAll('[data-vdel]').forEach(b => b.onclick = () => { sync(); p.variants.splice(+b.dataset.vdel, 1); draw(); });
     md.querySelectorAll('[data-vr]').forEach(b => b.onclick = () => { sync(); p.variants[+b.dataset.vr].image = ''; draw(); });
     md.querySelectorAll('[data-vf]').forEach(inp => {
@@ -421,19 +492,25 @@ function editProduct(id) {
       p.specs = (p.specs || '').trim();
       p.usage = (p.usage || '').trim();
       p.discount = clampDisc(p.discount || 0);
+      p.stock = parseStock(p.stock);
+      p.inStock = p.stock !== null ? p.stock > 0 : p.inStock !== false;
       if (!p.name) { toast('اكتبي اسم المنتج'); return; }
       p.variants = p.variants
         .filter(v => v.name.trim())
-        .map(v => ({
-          name: v.name.trim(),
-          price: +v.price || 0,
-          discount: clampDisc(v.discount || 0),
-          description: (v.description || '').trim(),
-          specs: (v.specs || '').trim(),
-          usage: (v.usage || '').trim(),
-          inStock: v.inStock !== false,
-          image: v.image || ''
-        }));
+        .map(v => {
+          const st = parseStock(v.stock);
+          return {
+            name: v.name.trim(),
+            price: +v.price || 0,
+            discount: clampDisc(v.discount || 0),
+            stock: st,
+            description: (v.description || '').trim(),
+            specs: (v.specs || '').trim(),
+            usage: (v.usage || '').trim(),
+            inStock: st !== null ? st > 0 : v.inStock !== false,
+            image: v.image || ''
+          };
+        });
       const names = p.variants.map(v => v.name);
       if (new Set(names).size !== names.length) { toast('أسماء الأنواع يجب ألا تتكرر'); return; }
       if (p.variants.length) p.price = 0;
