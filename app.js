@@ -30,6 +30,11 @@ function getEffectiveStock(p, v = null) {
   return Math.max(0, Math.floor(Number(raw) || 0) - used);
 }
 
+function getCartQtyFor(pid, vName = '') {
+  const item = cart.find(c => c.pid === pid && (c.v || '') === (vName || ''));
+  return item ? Math.max(0, Math.floor(Number(item.q) || 0)) : 0;
+}
+
 function isVariantAvailable(p, v) {
   if (v.inStock === false) return false;
   const st = getEffectiveStock(p, v);
@@ -193,7 +198,15 @@ function openProduct(id) {
     const activeVariant = hasVariants(p) && sel >= 0 ? p.variants[sel] : null;
     const itemAvailable = activeVariant ? isVariantAvailable(p, activeVariant) : isProductAvailable(p);
     const maxStock = getEffectiveStock(p, activeVariant);
-    if (maxStock !== null && maxStock > 0 && qty > maxStock) qty = maxStock;
+    const inCartQty = getCartQtyFor(p.id, activeVariant ? activeVariant.name : '');
+    const remainingToAdd = maxStock === null ? null : Math.max(0, maxStock - inCartQty);
+    const canAddMore = itemAvailable && (remainingToAdd === null || remainingToAdd > 0);
+
+    if (remainingToAdd !== null && remainingToAdd > 0 && qty > remainingToAdd) {
+      qty = remainingToAdd;
+    } else if (remainingToAdd === 0) {
+      qty = 1;
+    }
 
     const rawPrice = activeVariant ? (+activeVariant.price || 0) : (+p.price || 0);
     const activeDisc = activeVariant ? effectiveVarDisc(p, activeVariant) : clampDisc(p.discount || 0);
@@ -238,11 +251,18 @@ function openProduct(id) {
          </div>`
       : `<div style="font-size:1.3rem;color:var(--pink);font-weight:700">${fmt(finalPrice)} ${esc(cur)}</div>`;
 
-    const stockNoticeHtml = !itemAvailable
-      ? `<div style="margin:8px 0;padding:8px 12px;border-radius:10px;background:#fff0f0;color:#c92a2a;font-weight:700;font-size:13.5px;text-align:center">غير متوفر حالياً (نفدت الكمية)</div>`
-      : (maxStock !== null && maxStock <= 5
-          ? `<div style="margin:6px 0;font-size:12.5px;color:#b45309;font-weight:600">الكمية المتبقية: ${maxStock} فقط</div>`
-          : '');
+    let stockNoticeHtml = '';
+    if (!itemAvailable) {
+      stockNoticeHtml = `<div style="margin:8px 0;padding:8px 12px;border-radius:10px;background:#fff0f0;color:#c92a2a;font-weight:700;font-size:13.5px;text-align:center">غير متوفر حالياً (نفدت الكمية)</div>`;
+    } else if (remainingToAdd === 0) {
+      stockNoticeHtml = `<div style="margin:8px 0;padding:8px 12px;border-radius:10px;background:#fff8e6;color:#b45309;font-weight:700;font-size:13px;text-align:center">وصلتِ للحد الأقصى المتوفر في المخزن (في السلة: ${inCartQty})</div>`;
+    } else if (maxStock !== null) {
+      stockNoticeHtml = `<div style="margin:6px 0;font-size:12.5px;color:#b45309;font-weight:600">المتوفر بالمخزن: ${maxStock}${inCartQty > 0 ? ` (في السلة: ${inCartQty} · المتاح إضافته: ${remainingToAdd})` : ''}</div>`;
+    }
+
+    const addBtnLabel = !itemAvailable
+      ? 'غير متوفر'
+      : (remainingToAdd === 0 ? 'الكمية الكاملة في السلة' : 'أضيفي إلى السلة');
 
     $('#pmodal').innerHTML = `
       <button class="x" id="px">×</button>
@@ -262,10 +282,10 @@ function openProduct(id) {
       ${stockNoticeHtml}
       <div class="row" style="justify-content:space-between">
         ${priceBlockHtml}
-        <div class="qty"><button id="qm" ${!itemAvailable ? 'disabled' : ''}>−</button><span>${qty}</span><button id="qp" ${!itemAvailable || (maxStock !== null && qty >= maxStock) ? 'disabled' : ''}>+</button></div>
+        <div class="qty"><button id="qm" ${!canAddMore || qty <= 1 ? 'disabled' : ''}>−</button><span>${qty}</span><button id="qp" ${!canAddMore || (remainingToAdd !== null && qty >= remainingToAdd) ? 'disabled' : ''}>+</button></div>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
-        <button class="btn" id="add" style="width:100%" ${!itemAvailable ? 'disabled' : ''}>${itemAvailable ? 'أضيفي إلى السلة' : 'غير متوفر'}</button>
+        <button class="btn" id="add" style="width:100%" ${!canAddMore ? 'disabled' : ''}>${addBtnLabel}</button>
         <button type="button" class="btn sec" id="consult" style="width:100%;background:#e8f8ee;color:#157347;border:1px solid #b7e4c7">💬 استشارة مجانية عبر واتساب</button>
       </div>
       ${bottomInfoHtml}`;
@@ -279,13 +299,13 @@ function openProduct(id) {
     });
     $('#qm').onclick = () => { qty = Math.max(1, qty - 1); draw(); };
     $('#qp').onclick = () => {
-      if (maxStock !== null && qty >= maxStock) return;
+      if (remainingToAdd !== null && qty >= remainingToAdd) return;
       qty++;
       draw();
     };
     $('#consult').onclick = () => openConsultWhatsApp(p, activeVariant);
     $('#add').onclick = () => {
-      if (!itemAvailable) return;
+      if (!canAddMore) return;
       const v = activeVariant ? activeVariant.name : '';
       const ex = cart.find(c => c.pid === p.id && c.v === v);
       const currentInCart = ex ? ex.q : 0;
@@ -330,7 +350,11 @@ function resolve(c) {
 
 function renderCart() {
   const cur = D.settings.currency || '';
+  const prevLen = cart.length;
   cart = cart.filter(resolve);
+  if (cart.length !== prevLen) {
+    try { localStorage.setItem('cart', JSON.stringify(cart)); } catch (e) {}
+  }
   $('#cartCount').textContent = cart.reduce((s, c) => s + c.q, 0);
   if (!cart.length) { $('#cartBody').innerHTML = '<div class="empty">السلة فارغة</div>'; $('#cartFoot').innerHTML = ''; return; }
   let total = 0;
@@ -343,7 +367,7 @@ function renderCart() {
       : '';
     return `<div class="ci" style="display:flex;align-items:center;gap:10px">
       ${imgHtml}
-      <div class="t" style="flex:1">${esc(r.p.name)}<small>${esc(c.v)}${c.v ? ' · ' : ''}${fmt(r.price)} ${esc(cur)}${r.disc > 0 ? ` (خصم ${r.disc}%)` : ''}</small></div>
+      <div class="t" style="flex:1">${esc(r.p.name)}<small>${esc(c.v)}${c.v ? ' · ' : ''}${fmt(r.price)} ${esc(cur)}${r.disc > 0 ? ` (خصم ${r.disc}%)` : ''}${r.maxStock !== null ? ` · المتوفر: ${r.maxStock}` : ''}</small></div>
       <div class="qty"><button data-m="${i}">−</button><span>${c.q}</span><button data-p="${i}" ${r.maxStock !== null && c.q >= r.maxStock ? 'disabled' : ''}>+</button></div>
     </div>`;
   }).join('');
