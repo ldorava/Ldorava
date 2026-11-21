@@ -11,7 +11,12 @@ const discPrice = (price, disc) => {
   const pct = clampDisc(disc);
   return pct > 0 ? Math.round(base * (1 - pct / 100)) : base;
 };
-const parseStock = val => (val === '' || val === null || val === undefined) ? null : Math.max(0, Math.floor(Number(val) || 0));
+const parseStock = val => {
+  if (val === '' || val === null || val === undefined) return null;
+  const n = Number(val);
+  if (Number.isNaN(n)) return null;
+  return Math.max(0, Math.floor(n));
+};
 
 let cfg = {};
 try { cfg = JSON.parse(localStorage.getItem('gh_cfg') || '{}'); } catch (e) {}
@@ -169,33 +174,45 @@ function render() {
 
 const hasVar = p => Array.isArray(p.variants) && p.variants.length > 0;
 const effectiveVarDisc = (p, v) => clampDisc(v.discount || p.discount || 0);
-const isVarAvail = v => v.inStock !== false && (v.stock === null || v.stock === undefined || Number(v.stock) > 0);
-const isProdAvail = p => hasVar(p)
-  ? p.variants.some(isVarAvail)
-  : (p.inStock !== false && (p.stock === null || p.stock === undefined || Number(p.stock) > 0));
+const isVarAvail = v => {
+  const st = parseStock(v.stock);
+  if (st !== null) return st > 0;
+  return v.inStock !== false;
+};
+const isProdAvail = p => {
+  if (hasVar(p)) return p.variants.some(isVarAvail);
+  const st = parseStock(p.stock);
+  if (st !== null) return st > 0;
+  return p.inStock !== false;
+};
 
 const isProdLowStock = p => {
   if (!isProdAvail(p)) return false;
   if (hasVar(p)) {
-    return p.variants.some(v => isVarAvail(v) && v.stock !== null && v.stock !== undefined && Number(v.stock) > 0 && Number(v.stock) <= 3);
+    return p.variants.some(v => {
+      const st = parseStock(v.stock);
+      return isVarAvail(v) && st !== null && st > 0 && st <= 3;
+    });
   }
-  return p.stock !== null && p.stock !== undefined && Number(p.stock) > 0 && Number(p.stock) <= 3;
+  const st = parseStock(p.stock);
+  return st !== null && st > 0 && st <= 3;
 };
 
 const stockBadge = p => {
   if (!isProdAvail(p)) return ' · <span style="color:#c92a2a;font-weight:700">غير متوفر</span>';
   if (hasVar(p)) {
-    const tracked = p.variants.filter(v => v.stock !== null && v.stock !== undefined);
+    const tracked = p.variants.filter(v => parseStock(v.stock) !== null);
     if (tracked.length) {
-      const sum = tracked.reduce((a, v) => a + (Number(v.stock) || 0), 0);
+      const sum = tracked.reduce((a, v) => a + (parseStock(v.stock) || 0), 0);
       const lowNote = isProdLowStock(p) ? ' <span style="color:#b45309;font-weight:700">(منخفض)</span>' : '';
       return ` · المتبقي: ${sum}${lowNote}`;
     }
     return '';
   }
-  if (p.stock !== null && p.stock !== undefined) {
+  const st = parseStock(p.stock);
+  if (st !== null) {
     const lowNote = isProdLowStock(p) ? ' <span style="color:#b45309;font-weight:700">(منخفض)</span>' : '';
-    return ` · الكمية: ${p.stock}${lowNote}`;
+    return ` · الكمية: ${st}${lowNote}`;
   }
   return '';
 };
@@ -327,7 +344,7 @@ function editProduct(id) {
   p.usage = p.usage || '';
   p.discount = clampDisc(p.discount || 0);
   p.stock = parseStock(p.stock);
-  p.inStock = p.inStock !== false && (p.stock === null || p.stock > 0);
+  p.inStock = p.stock !== null ? p.stock > 0 : (p.inStock !== false);
   p.variants = (p.variants || []).map(v => {
     const st = parseStock(v.stock);
     return {
@@ -338,7 +355,7 @@ function editProduct(id) {
       usage: v.usage || '',
       discount: clampDisc(v.discount || 0),
       stock: st,
-      inStock: v.inStock !== false && (st === null || st > 0)
+      inStock: st !== null ? st > 0 : (v.inStock !== false)
     };
   });
 
@@ -359,7 +376,7 @@ function editProduct(id) {
     p.price = +$('#fp').value || 0;
     p.discount = clampDisc($('#fdisc').value || 0);
     p.stock = parseStock($('#fstock').value);
-    p.inStock = p.stock !== null ? p.stock > 0 : $('#finstock').checked;
+    p.inStock = p.stock !== null ? p.stock > 0 : ($('#finstock') ? $('#finstock').checked : true);
 
     md.querySelectorAll('[data-vn]').forEach(i => { if (p.variants[+i.dataset.vn]) p.variants[+i.dataset.vn].name = i.value; });
     md.querySelectorAll('[data-vp]').forEach(i => { if (p.variants[+i.dataset.vp]) p.variants[+i.dataset.vp].price = +i.value || 0; });
@@ -367,8 +384,9 @@ function editProduct(id) {
     md.querySelectorAll('[data-vst]').forEach(i => {
       const v = p.variants[+i.dataset.vst];
       if (v) {
-        v.stock = parseStock(i.value);
-        if (v.stock !== null) v.inStock = v.stock > 0;
+        const st = parseStock(i.value);
+        v.stock = st;
+        v.inStock = st !== null ? st > 0 : true;
       }
     });
     md.querySelectorAll('[data-vdsc]').forEach(i => { if (p.variants[+i.dataset.vdsc]) p.variants[+i.dataset.vdsc].description = i.value; });
@@ -450,14 +468,15 @@ function editProduct(id) {
           const vSrc = v.image ? (previews[v.image] || v.image) : '';
           const effD = effectiveVarDisc(p, v);
           const vFinal = discPrice(v.price, effD);
-          const vOut = v.stock !== null ? v.stock <= 0 : v.inStock === false;
+          const vStock = parseStock(v.stock);
+          const vOut = vStock !== null ? vStock <= 0 : v.inStock === false;
           return `<div style="border:1px solid ${vOut ? 'rgba(201,42,42,.35)' : 'rgba(0,0,0,.12)'};border-radius:14px;padding:14px;background:${vOut ? '#fff8f8' : '#fff'};display:flex;flex-direction:column;gap:10px">
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
               ${thumbBox(vSrc, '🖼️', 48)}
               <input type="text" data-vn="${i}" value="${esc(v.name)}" placeholder="اسم النوع" style="flex:1;min-width:150px;font-size:14.5px;padding:10px 12px">
               <input type="number" data-vp="${i}" min="0" value="${v.price || 0}" placeholder="السعر" title="السعر" style="width:110px;font-size:14.5px;padding:10px 10px">
               <input type="number" data-vd="${i}" min="0" max="99" value="${clampDisc(v.discount || 0)}" placeholder="خصم %" title="نسبة الخصم %" style="width:86px;font-size:14.5px;padding:10px 8px">
-              <input type="number" data-vst="${i}" min="0" value="${v.stock !== null ? v.stock : ''}" placeholder="الكمية" title="الكمية المتوفرة (0 = غير متوفر)" style="width:94px;font-size:14.5px;padding:10px 8px">
+              <input type="number" data-vst="${i}" min="0" value="${vStock !== null ? vStock : ''}" placeholder="الكمية" title="الكمية المتوفرة (0 = غير متوفر)" style="width:94px;font-size:14.5px;padding:10px 8px">
             </div>
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
               ${effD > 0
@@ -465,7 +484,7 @@ function editProduct(id) {
                 : '<div></div>'}
               ${vOut
                 ? '<div style="font-size:13px;color:#c92a2a;font-weight:700">غير متوفر (نفدت الكمية)</div>'
-                : (v.stock !== null ? `<div style="font-size:13px;color:#495057">المتبقي بالمخزون: <b>${v.stock}</b></div>` : '')}
+                : (vStock !== null ? `<div style="font-size:13px;color:#495057">المتبقي بالمخزون: <b>${vStock}</b></div>` : '')}
             </div>
             <input type="text" data-vdsc="${i}" value="${esc(v.description || '')}" placeholder="وصف مختصر لهذا النوع..." style="width:100%;box-sizing:border-box;font-size:14px;padding:10px 12px">
             <textarea data-vsp="${i}" rows="3" placeholder="المواصفات الخاصة بهذا النوع..." style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.15);font-size:14px;line-height:1.6">${esc(v.specs || '')}</textarea>
@@ -541,7 +560,7 @@ function editProduct(id) {
       p.usage = (p.usage || '').trim();
       p.discount = clampDisc(p.discount || 0);
       p.stock = parseStock(p.stock);
-      p.inStock = p.stock !== null ? p.stock > 0 : p.inStock !== false;
+      p.inStock = p.stock !== null ? p.stock > 0 : (p.inStock !== false);
       if (!p.name) { toast('اكتبي اسم المنتج'); return; }
       p.variants = p.variants
         .filter(v => v.name.trim())
@@ -555,13 +574,16 @@ function editProduct(id) {
             description: (v.description || '').trim(),
             specs: (v.specs || '').trim(),
             usage: (v.usage || '').trim(),
-            inStock: st !== null ? st > 0 : v.inStock !== false,
+            inStock: st !== null ? st > 0 : (v.inStock !== false),
             image: v.image || ''
           };
         });
       const names = p.variants.map(v => v.name);
       if (new Set(names).size !== names.length) { toast('أسماء الأنواع يجب ألا تتكرر'); return; }
-      if (p.variants.length) p.price = 0;
+      if (p.variants.length) {
+        p.price = 0;
+        p.inStock = p.variants.some(v => isVarAvail(v));
+      }
       const i = D.products.findIndex(x => x.id === p.id);
       i >= 0 ? D.products[i] = p : D.products.push(p);
       setDirty(true); closeModal(); render();
