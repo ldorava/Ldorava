@@ -143,7 +143,10 @@
       "usage": "",
       "image": "images/1795199388377.jpg",
       "price": 75000,
-      "variants": []
+      "variants": [],
+      "discount": 0,
+      "stock": 0,
+      "inStock": false
     },
     {
       "id": "pmwox6oii0ti",
