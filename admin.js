@@ -13,8 +13,10 @@ const discPrice = (price, disc) => {
 };
 const parseStock = val => {
   if (val === '' || val === null || val === undefined) return null;
-  const n = Number(val);
-  if (Number.isNaN(n)) return null;
+  const trimmed = String(val).trim();
+  if (trimmed === '') return null;
+  const n = Number(trimmed);
+  if (!Number.isFinite(n)) return null;
   return Math.max(0, Math.floor(n));
 };
 
@@ -375,7 +377,8 @@ function editProduct(id) {
     p.usage = $('#fus').value;
     p.price = +$('#fp').value || 0;
     p.discount = clampDisc($('#fdisc').value || 0);
-    p.stock = parseStock($('#fstock').value);
+    const rawMainStock = $('#fstock').value;
+    p.stock = parseStock(rawMainStock);
     p.inStock = p.stock !== null ? p.stock > 0 : ($('#finstock') ? $('#finstock').checked : true);
 
     md.querySelectorAll('[data-vn]').forEach(i => { if (p.variants[+i.dataset.vn]) p.variants[+i.dataset.vn].name = i.value; });
@@ -559,7 +562,7 @@ function editProduct(id) {
       p.specs = (p.specs || '').trim();
       p.usage = (p.usage || '').trim();
       p.discount = clampDisc(p.discount || 0);
-      p.stock = parseStock(p.stock);
+      p.stock = parseStock($('#fstock') ? $('#fstock').value : p.stock);
       p.inStock = p.stock !== null ? p.stock > 0 : (p.inStock !== false);
       if (!p.name) { toast('اكتبي اسم المنتج'); return; }
       p.variants = p.variants
@@ -584,8 +587,9 @@ function editProduct(id) {
         p.price = 0;
         p.inStock = p.variants.some(v => isVarAvail(v));
       }
-      const i = D.products.findIndex(x => x.id === p.id);
-      i >= 0 ? D.products[i] = p : D.products.push(p);
+      const savedObj = JSON.parse(JSON.stringify(p));
+      const i = D.products.findIndex(x => x.id === savedObj.id);
+      i >= 0 ? D.products[i] = savedObj : D.products.push(savedObj);
       setDirty(true); closeModal(); render();
     };
   };
