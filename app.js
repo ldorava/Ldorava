@@ -12,15 +12,42 @@ const discPrice = (price, disc) => {
 let D = { settings: {}, categories: [], products: [] };
 let cart = [];
 try { cart = JSON.parse(localStorage.getItem('cart') || '[]'); } catch (e) {}
+let stockDeducted = {};
+try { stockDeducted = JSON.parse(localStorage.getItem('stock_deducted') || '{}'); } catch (e) {}
+
 let cat = 'all', q = '';
 let modalHistoryPushed = false;
 let cartHistoryPushed = false;
 
 const hasVariants = p => Array.isArray(p.variants) && p.variants.length > 0;
 const effectiveVarDisc = (p, v) => clampDisc(v.discount || p.discount || 0);
+
+function getEffectiveStock(p, v = null) {
+  const raw = v ? v.stock : p.stock;
+  if (raw === null || raw === undefined || raw === '') return null;
+  const key = v ? `${p.id}::${v.name}` : `${p.id}`;
+  const used = Number(stockDeducted[key] || 0);
+  return Math.max(0, Math.floor(Number(raw) || 0) - used);
+}
+
+function isVariantAvailable(p, v) {
+  if (v.inStock === false) return false;
+  const st = getEffectiveStock(p, v);
+  return st === null || st > 0;
+}
+
+function isProductAvailable(p) {
+  if (hasVariants(p)) return p.variants.some(v => isVariantAvailable(p, v));
+  if (p.inStock === false) return false;
+  const st = getEffectiveStock(p, null);
+  return st === null || st > 0;
+}
+
 const minPrice = p => {
   if (hasVariants(p)) {
-    return Math.min(...p.variants.map(v => discPrice(v.price, effectiveVarDisc(p, v))));
+    const avail = p.variants.filter(v => isVariantAvailable(p, v));
+    const pool = avail.length ? avail : p.variants;
+    return Math.min(...pool.map(v => discPrice(v.price, effectiveVarDisc(p, v))));
   }
   return discPrice(p.price, p.discount || 0);
 };
@@ -38,7 +65,7 @@ const thumb = (p, v = null, fit = 'cover') => {
 
 const cardThumb = p => {
   if (hasVariants(p)) {
-    const firstAvailable = p.variants.find(v => v.inStock !== false && v.image) || p.variants.find(v => v.image) || p.variants[0];
+    const firstAvailable = p.variants.find(v => isVariantAvailable(p, v) && v.image) || p.variants.find(v => v.image) || p.variants[0];
     return thumb(p, firstAvailable, 'cover');
   }
   return thumb(p, null, 'cover');
@@ -75,13 +102,31 @@ window.addEventListener('popstate', () => {
   }
 });
 
+function reconcileDeductedCache() {
+  let changed = false;
+  for (const key of Object.keys(stockDeducted)) {
+    const [pid, vname] = key.split('::');
+    const p = D.products.find(x => x.id === pid);
+    if (!p) { delete stockDeducted[key]; changed = true; continue; }
+    const v = vname ? (p.variants || []).find(x => x.name === vname) : null;
+    const raw = v ? v.stock : p.stock;
+    if (raw === null || raw === undefined || Number(raw) === 0) {
+      delete stockDeducted[key];
+      changed = true;
+    }
+  }
+  if (changed) {
+    try { localStorage.setItem('stock_deducted', JSON.stringify(stockDeducted)); } catch (e) {}
+  }
+}
+
 async function init() {
   try { D = await (await fetch('data/store.json?' + Date.now())).json(); } catch (e) { console.error(e); }
+  reconcileDeductedCache();
   const name = D.settings.name || 'المتجر';
   $('#shopName').textContent = name;
   document.title = name;
   $('#yr').textContent = new Date().getFullYear();
-  // إخفاء أو إزالة أي زر دخول للإدارة إذا كان موجوداً في HTML
   document.querySelectorAll('a[href*="admin"], button[data-admin], #adminBtn, #adminLink').forEach(el => el.remove());
   renderNav(); renderGrid(); renderCart();
 }
@@ -99,11 +144,14 @@ function renderGrid() {
     (cat === 'all' || p.category === cat) &&
     (!q || (p.name + ' ' + (p.description || '') + ' ' + (p.specs || '') + ' ' + (p.usage || '') + ' ' + (p.variants || []).map(v => `${v.description || ''} ${v.specs || ''} ${v.usage || ''}`).join(' ')).toLowerCase().includes(q.toLowerCase())));
   $('#grid').innerHTML = list.length ? list.map(p => {
-    const discounted = hasAnyDiscount(p);
+    const available = isProductAvailable(p);
+    const discounted = available && hasAnyDiscount(p);
     const origMin = hasVariants(p) ? Math.min(...p.variants.map(v => +v.price || 0)) : (+p.price || 0);
     return `
-    <div class="card" data-id="${esc(p.id)}" style="position:relative">
-      ${discounted ? `<span style="position:absolute;top:10px;right:10px;z-index:2;background:#dc3545;color:#fff;font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px">خصم</span>` : ''}
+    <div class="card" data-id="${esc(p.id)}" style="position:relative;${!available ? 'opacity:.78' : ''}">
+      ${!available
+        ? `<span style="position:absolute;top:10px;right:10px;z-index:2;background:#495057;color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px">غير متوفر</span>`
+        : (discounted ? `<span style="position:absolute;top:10px;right:10px;z-index:2;background:#dc3545;color:#fff;font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px">خصم</span>` : '')}
       <div class="img">${cardThumb(p)}</div>
       <div class="b">
         <h3>${esc(p.name)}</h3>
@@ -111,7 +159,9 @@ function renderGrid() {
           ${hasVariants(p) && p.variants.length > 1 ? 'من ' : ''}${fmt(minPrice(p))} ${esc(cur)}
           ${discounted ? `<small style="text-decoration:line-through;color:var(--muted);margin-right:6px;font-weight:400">${fmt(origMin)}</small>` : ''}
         </div>
-        ${hasVariants(p) ? `<div class="tag">${p.variants.length} أنواع</div>` : ''}
+        ${!available
+          ? `<div class="tag" style="color:#c92a2a;font-weight:700">غير متوفر حالياً</div>`
+          : (hasVariants(p) ? `<div class="tag">${p.variants.length} أنواع</div>` : '')}
       </div>
     </div>`;
   }).join('') : '<div class="empty" style="grid-column:1/-1">لا توجد منتجات</div>';
@@ -130,12 +180,21 @@ function openConsultWhatsApp(p, activeVariant) {
 
 function openProduct(id) {
   const p = D.products.find(x => x.id === id); if (!p) return;
-  let sel = hasVariants(p) ? p.variants.findIndex(v => v.inStock !== false) : -1;
+  let sel = hasVariants(p)
+    ? (() => {
+        const idx = p.variants.findIndex(v => isVariantAvailable(p, v));
+        return idx >= 0 ? idx : 0;
+      })()
+    : -1;
   let qty = 1;
 
   const draw = () => {
     const cur = D.settings.currency || '';
     const activeVariant = hasVariants(p) && sel >= 0 ? p.variants[sel] : null;
+    const itemAvailable = activeVariant ? isVariantAvailable(p, activeVariant) : isProductAvailable(p);
+    const maxStock = getEffectiveStock(p, activeVariant);
+    if (maxStock !== null && maxStock > 0 && qty > maxStock) qty = maxStock;
+
     const rawPrice = activeVariant ? (+activeVariant.price || 0) : (+p.price || 0);
     const activeDisc = activeVariant ? effectiveVarDisc(p, activeVariant) : clampDisc(p.discount || 0);
     const finalPrice = discPrice(rawPrice, activeDisc);
@@ -149,7 +208,7 @@ function openProduct(id) {
            <img src="${esc(activeVariant.image)}" alt="${esc(activeVariant.name)}" style="width:68px;height:68px;object-fit:contain;border-radius:10px;flex-shrink:0;background:#fafafa">
            <div style="font-size:13px;line-height:1.5">
              <div style="font-weight:700">${esc(activeVariant.name)}</div>
-             <div style="color:var(--muted)">صورة النوع المختار</div>
+             <div style="color:${itemAvailable ? 'var(--muted)' : '#c92a2a'}">${itemAvailable ? 'صورة النوع المختار' : 'غير متوفر حالياً'}</div>
            </div>
          </div>`
       : '';
@@ -179,6 +238,12 @@ function openProduct(id) {
          </div>`
       : `<div style="font-size:1.3rem;color:var(--pink);font-weight:700">${fmt(finalPrice)} ${esc(cur)}</div>`;
 
+    const stockNoticeHtml = !itemAvailable
+      ? `<div style="margin:8px 0;padding:8px 12px;border-radius:10px;background:#fff0f0;color:#c92a2a;font-weight:700;font-size:13.5px;text-align:center">غير متوفر حالياً (نفدت الكمية)</div>`
+      : (maxStock !== null && maxStock <= 5
+          ? `<div style="margin:6px 0;font-size:12.5px;color:#b45309;font-weight:600">الكمية المتبقية: ${maxStock} فقط</div>`
+          : '');
+
     $('#pmodal').innerHTML = `
       <button class="x" id="px">×</button>
       <div class="pimg" style="width:100%;height:340px;max-height:52vh;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:14px;overflow:hidden;padding:8px;box-sizing:border-box">${thumb(p, activeVariant, 'contain')}</div>
@@ -186,17 +251,21 @@ function openProduct(id) {
       <div class="tag" style="color:var(--muted)">${esc(catOf(p)?.name || '')}</div>
       ${descHtml}
       ${variantImgHtml}
-      ${hasVariants(p) ? `<div><b>اختاري النوع:</b></div><div class="chips">${p.variants.map((v, i) => `
-        <span class="chip ${i === sel ? 'on' : ''} ${v.inStock === false ? 'off' : ''}" data-i="${i}">
+      ${hasVariants(p) ? `<div><b>اختاري النوع:</b></div><div class="chips">${p.variants.map((v, i) => {
+        const vAvail = isVariantAvailable(p, v);
+        return `
+        <span class="chip ${i === sel ? 'on' : ''} ${!vAvail ? 'off' : ''}" data-i="${i}" style="${!vAvail ? 'opacity:.55' : ''}">
           ${v.image ? `<img src="${esc(v.image)}" alt="${esc(v.name)}" style="width:20px;height:20px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-left:4px">` : ''}
-          ${esc(v.name)}
-        </span>`).join('')}</div>` : ''}
+          ${esc(v.name)}${!vAvail ? ' (غير متوفر)' : ''}
+        </span>`;
+      }).join('')}</div>` : ''}
+      ${stockNoticeHtml}
       <div class="row" style="justify-content:space-between">
         ${priceBlockHtml}
-        <div class="qty"><button id="qm">−</button><span>${qty}</span><button id="qp">+</button></div>
+        <div class="qty"><button id="qm" ${!itemAvailable ? 'disabled' : ''}>−</button><span>${qty}</span><button id="qp" ${!itemAvailable || (maxStock !== null && qty >= maxStock) ? 'disabled' : ''}>+</button></div>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
-        <button class="btn" id="add" style="width:100%" ${sel < 0 && hasVariants(p) ? 'disabled' : ''}>أضيفي إلى السلة</button>
+        <button class="btn" id="add" style="width:100%" ${!itemAvailable ? 'disabled' : ''}>${itemAvailable ? 'أضيفي إلى السلة' : 'غير متوفر'}</button>
         <button type="button" class="btn sec" id="consult" style="width:100%;background:#e8f8ee;color:#157347;border:1px solid #b7e4c7">💬 استشارة مجانية عبر واتساب</button>
       </div>
       ${bottomInfoHtml}`;
@@ -204,17 +273,26 @@ function openProduct(id) {
     $('#px').onclick = () => hideProductOverlay(false);
     $('#pmodal').querySelectorAll('.chip').forEach(c => c.onclick = () => {
       const i = +c.dataset.i;
-      if (p.variants[i].inStock === false) return;
       sel = i;
+      qty = 1;
       draw();
     });
     $('#qm').onclick = () => { qty = Math.max(1, qty - 1); draw(); };
-    $('#qp').onclick = () => { qty++; draw(); };
+    $('#qp').onclick = () => {
+      if (maxStock !== null && qty >= maxStock) return;
+      qty++;
+      draw();
+    };
     $('#consult').onclick = () => openConsultWhatsApp(p, activeVariant);
     $('#add').onclick = () => {
+      if (!itemAvailable) return;
       const v = activeVariant ? activeVariant.name : '';
       const ex = cart.find(c => c.pid === p.id && c.v === v);
-      ex ? ex.q += qty : cart.push({ pid: p.id, v, q: qty });
+      const currentInCart = ex ? ex.q : 0;
+      let nextQty = currentInCart + qty;
+      if (maxStock !== null && nextQty > maxStock) nextQty = maxStock;
+      if (nextQty <= 0) return;
+      ex ? ex.q = nextQty : cart.push({ pid: p.id, v, q: nextQty });
       saveCart();
       hideProductOverlay(false);
       openCart();
@@ -238,11 +316,16 @@ function resolve(c) {
   let variant = null;
   if (hasVariants(p)) {
     variant = p.variants.find(x => x.name === c.v);
-    if (!variant) return null;
+    if (!variant || !isVariantAvailable(p, variant)) return null;
     price = variant.price;
     disc = effectiveVarDisc(p, variant);
+  } else if (!isProductAvailable(p)) {
+    return null;
   }
-  return { p, variant, price: discPrice(price, disc), origPrice: +price || 0, disc };
+  const maxStock = getEffectiveStock(p, variant);
+  if (maxStock !== null && c.q > maxStock) c.q = maxStock;
+  if (c.q < 1) return null;
+  return { p, variant, price: discPrice(price, disc), origPrice: +price || 0, disc, maxStock };
 }
 
 function renderCart() {
@@ -261,18 +344,37 @@ function renderCart() {
     return `<div class="ci" style="display:flex;align-items:center;gap:10px">
       ${imgHtml}
       <div class="t" style="flex:1">${esc(r.p.name)}<small>${esc(c.v)}${c.v ? ' · ' : ''}${fmt(r.price)} ${esc(cur)}${r.disc > 0 ? ` (خصم ${r.disc}%)` : ''}</small></div>
-      <div class="qty"><button data-m="${i}">−</button><span>${c.q}</span><button data-p="${i}">+</button></div>
+      <div class="qty"><button data-m="${i}">−</button><span>${c.q}</span><button data-p="${i}" ${r.maxStock !== null && c.q >= r.maxStock ? 'disabled' : ''}>+</button></div>
     </div>`;
   }).join('');
   $('#cartBody').querySelectorAll('[data-m]').forEach(b => b.onclick = () => { const c = cart[+b.dataset.m]; c.q--; if (c.q < 1) cart.splice(+b.dataset.m, 1); saveCart(); });
-  $('#cartBody').querySelectorAll('[data-p]').forEach(b => b.onclick = () => { cart[+b.dataset.p].q++; saveCart(); });
+  $('#cartBody').querySelectorAll('[data-p]').forEach(b => b.onclick = () => {
+    const c = cart[+b.dataset.p];
+    const r = resolve(c);
+    if (r && r.maxStock !== null && c.q >= r.maxStock) return;
+    c.q++;
+    saveCart();
+  });
   $('#cartFoot').innerHTML = `<div class="row" style="justify-content:space-between;margin-bottom:10px"><b>الإجمالي</b><b>${fmt(total)} ${esc(cur)}</b></div>
     <button class="btn" id="order" style="width:100%">إرسال الطلب عبر واتساب</button>`;
   $('#order').onclick = () => {
-    const lines = cart.map(c => { const r = resolve(c); return `• ${r.p.name}${c.v ? ' (' + c.v + ')' : ''} × ${c.q} = ${fmt(r.price * c.q)}`; });
-    const msg = `طلب جديد:\n${lines.join('\n')}\nالإجمالي: ${fmt(total)} ${cur}`;
     const num = (D.settings.whatsapp || '').replace(/\D/g, '');
     if (!num) { alert('لم يتم ضبط رقم واتساب في لوحة الإدارة'); return; }
+    const lines = cart.map(c => { const r = resolve(c); return `• ${r.p.name}${c.v ? ' (' + c.v + ')' : ''} × ${c.q} = ${fmt(r.price * c.q)}`; });
+    const msg = `طلب جديد:\n${lines.join('\n')}\nالإجمالي: ${fmt(total)} ${cur}`;
+
+    // خصم الكمية المطلوبة من المخزون تلقائياً وتحديث حالة التوفر
+    cart.forEach(c => {
+      const r = resolve(c);
+      if (!r || r.maxStock === null) return;
+      const key = r.variant ? `${r.p.id}::${r.variant.name}` : `${r.p.id}`;
+      stockDeducted[key] = (Number(stockDeducted[key]) || 0) + c.q;
+    });
+    try { localStorage.setItem('stock_deducted', JSON.stringify(stockDeducted)); } catch (e) {}
+    cart = [];
+    saveCart();
+    renderGrid();
+
     window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 }
