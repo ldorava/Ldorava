@@ -77,6 +77,140 @@
     <div class="ft" id="cartFoot"></div>
   </aside>
 
+  <!-- مساعد L'DORA Viva الكتابي -->
+  <style>
+    #ldorava-chat-btn {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      z-index: 9998;
+      background: #d6336c;
+      color: #ffffff;
+      border: none;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(214, 51, 108, 0.35);
+    }
+
+    #ldorava-chat-box {
+      display: none;
+      position: fixed;
+      bottom: 76px;
+      left: 20px;
+      width: 340px;
+      max-width: calc(100vw - 32px);
+      height: 440px;
+      z-index: 9998;
+      background: #ffffff;
+      color: #1f2937;
+      border-radius: 18px;
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
+      overflow: hidden;
+      flex-direction: column;
+      font-family: inherit;
+      border: 1px solid #f3f4f6;
+    }
+
+    #ldorava-chat-header {
+      background: #d6336c;
+      color: #ffffff;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    #ldorava-chat-close {
+      background: transparent;
+      border: none;
+      color: #ffffff;
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    #ldorava-chat-messages {
+      flex: 1;
+      padding: 12px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: #fdf2f8;
+    }
+
+    .ld-msg {
+      max-width: 84%;
+      padding: 9px 12px;
+      border-radius: 14px;
+      font-size: 13.5px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .ld-msg.user {
+      align-self: flex-start;
+      background: #d6336c;
+      color: #ffffff;
+    }
+
+    .ld-msg.bot {
+      align-self: flex-end;
+      background: #ffffff;
+      color: #1f2937;
+      border: 1px solid #fce7f3;
+    }
+
+    #ldorava-chat-form {
+      display: flex;
+      border-top: 1px solid #e5e7eb;
+      background: #ffffff;
+    }
+
+    #ldorava-chat-input {
+      flex: 1;
+      border: none;
+      padding: 10px 12px;
+      font-size: 13.5px;
+      outline: none;
+      font-family: inherit;
+    }
+
+    #ldorava-chat-send {
+      border: none;
+      background: #d6336c;
+      color: #ffffff;
+      padding: 0 15px;
+      cursor: pointer;
+      font-size: 13.5px;
+      font-weight: bold;
+      font-family: inherit;
+    }
+  </style>
+
+  <button id="ldorava-chat-btn" type="button">💬 مساعد L'DORA</button>
+
+  <div id="ldorava-chat-box" dir="rtl">
+    <div id="ldorava-chat-header">
+      <span>مساعد متجر L'DORA Viva</span>
+      <button id="ldorava-chat-close" type="button" aria-label="إغلاق">×</button>
+    </div>
+    <div id="ldorava-chat-messages">
+      <div class="ld-msg bot">أهلاً بك في L'DORA Viva! اسألني عن المنتجات والأسعار والمواصفات.</div>
+    </div>
+    <form id="ldorava-chat-form">
+      <input id="ldorava-chat-input" type="text" placeholder="اكتب سؤالك هنا..." autocomplete="off" />
+      <button id="ldorava-chat-send" type="submit">إرسال</button>
+    </form>
+  </div>
+
   <script src="app.js"></script>
   <script>
     let deferredPrompt;
@@ -133,6 +267,69 @@
       document.getElementById('closeIosInstall').onclick = () => iosOv.style.display = 'none';
       document.getElementById('okIosInstall').onclick = () => iosOv.style.display = 'none';
     }
+
+    // منطق المحادثة الكتابية مع السيرفر الوسيط على Vercel
+    const PROXY_CHAT_URL = "https://ldorava-ai-proxy-one.vercel.app/chat";
+    const chatBtn = document.getElementById("ldorava-chat-btn");
+    const chatBox = document.getElementById("ldorava-chat-box");
+    const chatClose = document.getElementById("ldorava-chat-close");
+    const chatForm = document.getElementById("ldorava-chat-form");
+    const chatInput = document.getElementById("ldorava-chat-input");
+    const chatMessages = document.getElementById("ldorava-chat-messages");
+    const chatSend = document.getElementById("ldorava-chat-send");
+
+    let chatHistory = [];
+
+    chatBtn.addEventListener("click", () => {
+      chatBox.style.display = chatBox.style.display === "flex" ? "none" : "flex";
+    });
+
+    chatClose.addEventListener("click", () => {
+      chatBox.style.display = "none";
+    });
+
+    function appendChatMessage(text, sender) {
+      const div = document.createElement("div");
+      div.className = `ld-msg ${sender}`;
+      div.textContent = text;
+      chatMessages.appendChild(div);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      return div;
+    }
+
+    chatForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const message = chatInput.value.trim();
+      if (!message) return;
+
+      appendChatMessage(message, "user");
+      chatInput.value = "";
+      chatSend.disabled = true;
+      const loadingMsg = appendChatMessage("يكتب الآن...", "bot");
+
+      try {
+        const res = await fetch(PROXY_CHAT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: message,
+            history: chatHistory.slice(-6)
+          })
+        });
+
+        const data = await res.json();
+        const replyText = data.reply || "عذراً، تعذر الحصول على رد حالياً.";
+        loadingMsg.textContent = replyText;
+
+        chatHistory.push({ role: "user", text: message });
+        chatHistory.push({ role: "model", text: replyText });
+      } catch (err) {
+        loadingMsg.textContent = "تعذر الاتصال بالمساعد حالياً، حاول مرة أخرى.";
+      } finally {
+        chatSend.disabled = false;
+        chatInput.focus();
+      }
+    });
   </script>
 </body>
 </html>
