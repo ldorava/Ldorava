@@ -297,6 +297,32 @@
       return div;
     }
 
+    function addProductIdToStoreCart(productId) {
+      if (!productId) return;
+
+      const candidateFns = [
+        window.addToCart,
+        window.addProductToCart,
+        window.handleAddToCart
+      ];
+      for (const fn of candidateFns) {
+        if (typeof fn === "function") {
+          fn(productId);
+          return;
+        }
+      }
+
+      window.dispatchEvent(new CustomEvent("ldorava:addToCart", {
+        detail: { productId }
+      }));
+
+      const countEl = document.getElementById("cartCount");
+      if (countEl) {
+        const current = parseInt(countEl.textContent || "0", 10) || 0;
+        countEl.textContent = String(current + 1);
+      }
+    }
+
     chatForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const message = chatInput.value.trim();
@@ -320,6 +346,10 @@
         const data = await res.json();
         const replyText = data.reply || "عذراً، تعذر الحصول على رد حالياً.";
         loadingMsg.textContent = replyText;
+
+        if (data.add_to_cart_id) {
+          addProductIdToStoreCart(data.add_to_cart_id);
+        }
 
         chatHistory.push({ role: "user", text: message });
         chatHistory.push({ role: "model", text: replyText });
