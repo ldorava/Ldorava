@@ -217,12 +217,15 @@
   function renderProducts() {
     const view = $('#view');
     if (!view) return;
-    const rows = (D.products || []).map((p, idx) => `
+    const rows = (D.products || []).map((p, idx) => {
+      const vCount = Array.isArray(p.variants) ? p.variants.length : 0;
+      const vBadge = vCount > 0 ? ` · <strong>${vCount} أنواع</strong>` : '';
+      return `
       <div class="panel" style="margin-bottom:10px">
         <div class="row" style="justify-content:space-between">
           <div>
             <strong>${esc(p.name || 'منتج بدون اسم')}</strong>
-            <div class="muted" style="font-size:13px">السعر: ${esc(p.price ?? 0)} ${esc(D.settings?.currency || '')} · المخزون: ${p.stock ?? 'غير محدد'}</div>
+            <div class="muted" style="font-size:13px">السعر: ${esc(p.price ?? 0)} ${esc(D.settings?.currency || '')} · المخزون: ${p.stock ?? 'غير محدد'}${vBadge}</div>
           </div>
           <div class="row">
             <button class="btn sec sm" data-edit-p="${idx}" type="button">تعديل</button>
@@ -230,7 +233,8 @@
           </div>
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     view.innerHTML = `
       <div class="row" style="justify-content:space-between;margin-bottom:12px">
@@ -259,9 +263,149 @@
     const ov = $('#ov'), md = $('#md');
     if (!ov || !md) return;
     const isNew = idx < 0;
-    const p = isNew
-      ? { id: uid(), name: '', category: D.categories[0]?.id || '', price: 0, discount: 0, stock: null, image: '', description: '' }
-      : { ...D.products[idx] };
+    const srcProd = isNew ? {} : (D.products[idx] || {});
+
+    const p = {
+      ...srcProd,
+      id: srcProd.id || uid(),
+      name: srcProd.name || '',
+      category: srcProd.category || D.categories[0]?.id || '',
+      price: srcProd.price ?? 0,
+      discount: srcProd.discount ?? 0,
+      stock: srcProd.stock ?? null,
+      inStock: srcProd.inStock !== false,
+      image: srcProd.image || '',
+      description: srcProd.description || '',
+      specs: srcProd.specs || '',
+      usage: srcProd.usage || '',
+      variants: Array.isArray(srcProd.variants)
+        ? srcProd.variants.map(v => ({
+            id: v.id || uid(),
+            name: v.name || '',
+            price: v.price ?? srcProd.price ?? 0,
+            discount: v.discount ?? '',
+            stock: v.stock ?? '',
+            inStock: v.inStock !== false,
+            image: v.image || '',
+            description: v.description || '',
+            specs: v.specs || '',
+            usage: v.usage || ''
+          }))
+        : []
+    };
+
+    function renderVariantRowsHtml() {
+      if (!p.variants.length) {
+        return `<div class="muted" style="font-size:13px;padding:8px 0">لا توجد أنواع مضافة لهذا المنتج حالياً. اضغط «+ إضافة نوع» لإضافة درجات أو أحجام أو نكهات.</div>`;
+      }
+      return p.variants.map((v, vIdx) => `
+        <div class="panel" data-v-card="${vIdx}" style="margin-top:10px;padding:12px;background:#fdf8fb;border:1px solid #f5d0fe;border-radius:12px">
+          <div class="row" style="justify-content:space-between;margin-bottom:8px">
+            <strong style="color:var(--pink);font-size:13.5px">نوع #${vIdx + 1}: ${esc(v.name || 'بدون اسم')}</strong>
+            <div class="row">
+              <label style="display:inline-flex;align-items:center;gap:4px;margin:0;font-size:12.5px;font-weight:600;cursor:pointer">
+                <input type="checkbox" data-v-avail="${vIdx}" ${v.inStock !== false ? 'checked' : ''} style="width:auto">
+                متوفر
+              </label>
+              <button class="btn danger sm" type="button" data-v-del="${vIdx}">حذف النوع</button>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div>
+              <label style="font-size:12px">اسم النوع (مثل: 01 وردي، 500 مل)</label>
+              <input type="text" data-v-name="${vIdx}" value="${esc(v.name)}" placeholder="اسم النوع">
+            </div>
+            <div>
+              <label style="font-size:12px">سعر النوع</label>
+              <input type="number" data-v-price="${vIdx}" value="${esc(v.price ?? 0)}">
+            </div>
+            <div>
+              <label style="font-size:12px">خصم النوع % (اختياري)</label>
+              <input type="number" data-v-disc="${vIdx}" value="${esc(v.discount ?? '')}" placeholder="مثال: 15">
+            </div>
+            <div>
+              <label style="font-size:12px">كمية النوع (فارغ = غير محدود)</label>
+              <input type="number" data-v-stock="${vIdx}" value="${esc(v.stock ?? '')}" placeholder="مثال: 10">
+            </div>
+          </div>
+
+          <div style="margin-top:8px">
+            <label style="font-size:12px">رابط أو مسار صورة النوع (اختياري)</label>
+            <input type="text" data-v-img="${vIdx}" value="${esc(v.image || '')}" placeholder="اتركه فارغاً لاستخدام صورة المنتج">
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function syncDraftFromDom() {
+      p.name = ($('#epName')?.value ?? p.name);
+      p.category = ($('#epCat')?.value ?? p.category);
+      p.price = Number($('#epPrice')?.value ?? p.price) || 0;
+      p.discount = Math.max(0, Math.min(99, Number($('#epDisc')?.value ?? p.discount) || 0));
+      const stRaw = ($('#epStock')?.value ?? '').trim();
+      p.stock = stRaw === '' ? null : Math.max(0, parseInt(stRaw, 10) || 0);
+      p.inStock = Boolean($('#epInStock')?.checked);
+      p.image = ($('#epImg')?.value ?? p.image);
+      p.description = ($('#epDesc')?.value ?? p.description);
+
+      p.variants.forEach((v, vIdx) => {
+        const nameEl = md.querySelector(`[data-v-name="${vIdx}"]`);
+        const priceEl = md.querySelector(`[data-v-price="${vIdx}"]`);
+        const discEl = md.querySelector(`[data-v-disc="${vIdx}"]`);
+        const stockEl = md.querySelector(`[data-v-stock="${vIdx}"]`);
+        const imgEl = md.querySelector(`[data-v-img="${vIdx}"]`);
+        const availEl = md.querySelector(`[data-v-avail="${vIdx}"]`);
+
+        if (nameEl) v.name = nameEl.value;
+        if (priceEl) v.price = Number(priceEl.value) || 0;
+        if (discEl) {
+          const dVal = discEl.value.trim();
+          v.discount = dVal === '' ? '' : Math.max(0, Math.min(99, Number(dVal) || 0));
+        }
+        if (stockEl) {
+          const sVal = stockEl.value.trim();
+          v.stock = sVal === '' ? '' : Math.max(0, parseInt(sVal, 10) || 0);
+        }
+        if (imgEl) v.image = imgEl.value;
+        if (availEl) v.inStock = Boolean(availEl.checked);
+      });
+    }
+
+    function bindVariantEvents() {
+      $('#addVarBtn')?.addEventListener('click', () => {
+        syncDraftFromDom();
+        p.variants.push({
+          id: uid(),
+          name: '',
+          price: p.price || 0,
+          discount: '',
+          stock: '',
+          inStock: true,
+          image: '',
+          description: '',
+          specs: '',
+          usage: ''
+        });
+        refreshVariantsArea();
+      });
+
+      md.querySelectorAll('[data-v-del]').forEach(btn => {
+        btn.onclick = () => {
+          syncDraftFromDom();
+          const vIdx = +btn.dataset.vDel;
+          p.variants.splice(vIdx, 1);
+          refreshVariantsArea();
+        };
+      });
+    }
+
+    function refreshVariantsArea() {
+      const container = $('#variantsListContainer');
+      if (!container) return;
+      container.innerHTML = renderVariantRowsHtml();
+      bindVariantEvents();
+    }
 
     md.innerHTML = `
       <h3 style="margin-top:0">${isNew ? 'إضافة منتج' : 'تعديل منتج'}</h3>
@@ -271,37 +415,74 @@
         <option value="">-- بدون قسم --</option>
         ${(D.categories || []).map(c => `<option value="${esc(c.id)}" ${c.id === p.category ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}
       </select>
-      <label>السعر</label><input type="number" id="epPrice" value="${esc(p.price ?? 0)}">
+      <label>السعر الأساسي</label><input type="number" id="epPrice" value="${esc(p.price ?? 0)}">
       <label>نسبة الخصم %</label><input type="number" id="epDisc" value="${esc(p.discount ?? 0)}">
       <label>الكمية المتوفرة (اتركه فارغاً لغير محدود)</label><input type="number" id="epStock" value="${p.stock ?? ''}">
-      <label>رابط أو مسار الصورة</label><input type="text" id="epImg" value="${esc(p.image || '')}">
+      <label style="display:inline-flex;align-items:center;gap:6px;margin-top:8px;cursor:pointer">
+        <input type="checkbox" id="epInStock" ${p.inStock !== false ? 'checked' : ''} style="width:auto">
+        المنتج متوفر للبيع
+      </label>
+      <label>رابط أو مسار الصورة الرئيسية</label><input type="text" id="epImg" value="${esc(p.image || '')}">
       <label>الوصف</label><textarea id="epDesc">${esc(p.description || '')}</textarea>
-      <div class="row" style="margin-top:14px;justify-content:flex-end">
+
+      <div style="margin-top:16px;padding-top:12px;border-top:1px solid #e5e7eb">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <strong>أنواع المنتج (Variants)</strong>
+          <button class="btn sec sm" type="button" id="addVarBtn">+ إضافة نوع</button>
+        </div>
+        <div id="variantsListContainer">${renderVariantRowsHtml()}</div>
+      </div>
+
+      <div class="row" style="margin-top:16px;justify-content:flex-end">
         <button class="btn sec sm" id="epCancel" type="button">إلغاء</button>
         <button class="btn sm" id="epOk" type="button">تأكيد</button>
       </div>
     `;
 
     ov.classList.add('show');
+    bindVariantEvents();
+
     $('#epCancel').onclick = () => ov.classList.remove('show');
     ov.onclick = e => { if (e.target === ov) ov.classList.remove('show'); };
 
     $('#epOk').onclick = () => {
-      const name = $('#epName').value.trim();
+      syncDraftFromDom();
+      const name = (p.name || '').trim();
       if (!name) { alert('اكتب اسم المنتج'); return; }
-      const stockRaw = $('#epStock').value.trim();
+
+      const cleanVariants = (p.variants || [])
+        .map(v => ({
+          ...v,
+          id: v.id || uid(),
+          name: String(v.name || '').trim(),
+          price: Number(v.price) || 0,
+          discount: v.discount === '' ? undefined : Math.max(0, Math.min(99, Number(v.discount) || 0)),
+          stock: v.stock === '' ? undefined : Math.max(0, parseInt(v.stock, 10) || 0),
+          inStock: v.inStock !== false,
+          image: String(v.image || '').trim()
+        }))
+        .filter(v => v.name.length > 0);
+
       const updated = {
         ...p,
         name,
-        category: $('#epCat').value,
-        price: Number($('#epPrice').value) || 0,
-        discount: Math.max(0, Math.min(99, Number($('#epDisc').value) || 0)),
-        stock: stockRaw === '' ? null : Math.max(0, parseInt(stockRaw, 10) || 0),
-        image: $('#epImg').value.trim(),
-        description: $('#epDesc').value.trim()
+        category: String(p.category || '').trim(),
+        price: Number(p.price) || 0,
+        discount: Math.max(0, Math.min(99, Number(p.discount) || 0)),
+        stock: p.stock === null || p.stock === '' ? null : Math.max(0, parseInt(p.stock, 10) || 0),
+        inStock: p.inStock !== false,
+        image: String(p.image || '').trim(),
+        description: String(p.description || '').trim(),
+        variants: cleanVariants
       };
+
+      if (updated.variants.length === 0) {
+        delete updated.variants;
+      }
+
       if (isNew) D.products.unshift(updated);
       else D.products[idx] = updated;
+
       ov.classList.remove('show');
       setDirty(true);
       renderProducts();
