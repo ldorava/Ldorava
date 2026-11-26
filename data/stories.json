@@ -14,5 +14,21 @@
         "type": "video"
       }
     ]
+  },
+  {
+    "id": "story-1795677869890",
+    "title": "تونيك بالأعشاب لتقويه الحاجب",
+    "cover": "data/stories-media/poster-1795677877439.jpg",
+    "slides": [
+      {
+        "media": "data/stories-media/1795677877250-1001109063.mp4",
+        "caption": "",
+        "productId": "pmwoxag028gf",
+        "variantId": "",
+        "variantName": "",
+        "poster": "data/stories-media/poster-1795677877439.jpg",
+        "type": "video"
+      }
+    ]
   }
 ]
