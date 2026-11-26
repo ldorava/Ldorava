@@ -444,8 +444,14 @@
       document.getElementById('okIosInstall').onclick = () => iosOv.style.display = 'none';
     }
 
-    function addProductIdToStoreCart(productId) {
+    function addProductIdToStoreCart(productId, variantId = "", variantName = "") {
       if (!productId) return;
+
+      const payload = {
+        productId,
+        variantId: variantId || "",
+        variantName: variantName || ""
+      };
 
       const candidateFns = [
         window.addToCart,
@@ -454,13 +460,13 @@
       ];
       for (const fn of candidateFns) {
         if (typeof fn === "function") {
-          fn(productId);
+          fn(productId, variantId || undefined, variantName || undefined);
           return;
         }
       }
 
       window.dispatchEvent(new CustomEvent("ldorava:addToCart", {
-        detail: { productId }
+        detail: payload
       }));
 
       const countEl = document.getElementById("cartCount");
@@ -597,6 +603,19 @@
         }
       }
 
+      function getStoryCoverSrc(st) {
+        if (st.cover && st.cover.trim() !== "") return st.cover.trim();
+        const first = Array.isArray(st.slides) ? st.slides[0] : null;
+        if (first) {
+          if (first.poster) return first.poster;
+          const m = first.media || first.image || "";
+          if (m && !/\.(mp4|webm|mov)(\?.*)?$/i.test(m) && first.type !== "video") {
+            return m;
+          }
+        }
+        return "icon-512.png";
+      }
+
       function renderStoriesBar() {
         if (!bar) return;
         if (!storiesData.length) {
@@ -609,10 +628,11 @@
         bar.style.display = "flex";
         bar.innerHTML = storiesData.map((st, idx) => {
           const wasSeen = Boolean(seenMap[st.id]);
+          const coverSrc = getStoryCoverSrc(st);
           return `
             <div class="story-item" data-idx="${idx}">
               <div class="story-ring ${wasSeen ? "seen" : ""}">
-                <img src="${st.cover || "icon-512.png"}" alt="${st.title || ""}" loading="lazy">
+                <img src="${coverSrc}" alt="${st.title || ""}" loading="lazy">
               </div>
               <span class="story-title">${st.title || ""}</span>
             </div>
@@ -658,9 +678,12 @@
 
         if (slide.productId) {
           ctaBtn.style.display = "inline-block";
+          ctaBtn.textContent = slide.variantName
+            ? `🛒 أضيفي للسلة (${slide.variantName})`
+            : "🛒 أضيفي للسلة";
           ctaBtn.onclick = () => {
             closeStory();
-            addProductIdToStoreCart(slide.productId);
+            addProductIdToStoreCart(slide.productId, slide.variantId || "", slide.variantName || "");
           };
         } else {
           ctaBtn.style.display = "none";
