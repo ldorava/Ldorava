@@ -1,47 +1,13 @@
 [
   {
-    "id": "offers-today",
-    "title": "عروض اليوم 🔥",
-    "cover": "https://ldorava.github.io/Ldorava/icon-512.png",
+    "id": "story-1795662050050",
+    "title": "شامبو",
+    "cover": "data/stories-media/1795662076693-_________________________________________________200___.webp",
     "slides": [
       {
-        "media": "https://ldorava.github.io/Ldorava/icon-512.png",
-        "caption": "اختاري الباقة المناسبة لبشرتك أو شعرك واحصلي على أفضل النتائج.",
-        "productId": ""
-      },
-      {
-        "media": "https://ldorava.github.io/Ldorava/icon-512.png",
-        "caption": "منتج مميز متوفر الآن في المتجر — أضيفيه إلى سلتك مباشرة.",
-        "productId": "prod-1"
-      }
-    ]
-  },
-  {
-    "id": "skin-hair-guide",
-    "title": "اعرفي نوعك ✨",
-    "cover": "https://ldorava.github.io/Ldorava/icon-512.png",
-    "slides": [
-      {
-        "media": "https://ldorava.github.io/Ldorava/icon-512.png",
-        "caption": "اغسلي وجهك واتركيه ساعة بدون أي منتج لملاحظة الجفاف أو اللمعان بوضوح.",
-        "productId": ""
-      },
-      {
-        "media": "https://ldorava.github.io/Ldorava/icon-512.png",
-        "caption": "محتارة أي صابون أو مجموعة تناسبك؟ اسألي مساعد L'DORA في أسفل الشاشة.",
-        "productId": ""
-      }
-    ]
-  },
-  {
-    "id": "story-1795661485293",
-    "title": "ستوري جديد",
-    "cover": "icon-512.png",
-    "slides": [
-      {
-        "media": "icon-512.png",
+        "media": "data/stories-media/1795662076693-_________________________________________________200___.webp",
         "caption": "",
-        "productId": "pmwox5twsrxt"
+        "productId": ""
       }
     ]
   }
