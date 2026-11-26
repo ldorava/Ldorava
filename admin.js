@@ -575,8 +575,11 @@ function editProduct(id) {
   md.style.maxWidth = '960px';
   md.style.width = '96vw';
   md.style.maxHeight = '92vh';
-  md.style.padding = '22px';
-  md.style.overflowY = 'auto';
+  md.style.padding = '0';
+  md.style.overflow = 'hidden';
+  md.style.display = 'flex';
+  md.style.flexDirection = 'column';
+  md.style.position = 'relative';
 
   const getMainStockEl = () => md.querySelector('#fstock');
   const getMainInStockEl = () => md.querySelector('#finstock');
@@ -721,157 +724,167 @@ function editProduct(id) {
   const draw = () => {
     const hasVariants = p.variants.length > 0;
     const catIcon = D.categories.find(c => c.id === p.category)?.icon || '🛍️';
+    const prevScroll = md.querySelector('#epBody')?.scrollTop || 0;
 
-    md.innerHTML = `<button class="x" id="emx">×</button>
-      <h2 style="margin-top:0;color:var(--pink);font-size:1.35rem">${isNew ? 'إضافة منتج جديد' : 'تعديل المنتج'}</h2>
-
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
-        <div>
-          <label for="fn">اسم المنتج</label>
-          <input type="text" id="fn" value="${esc(p.name)}" placeholder="اسم المنتج" style="width:100%;box-sizing:border-box">
-        </div>
-        <div>
-          <label for="fc">القسم</label>
-          <select id="fc" style="width:100%;box-sizing:border-box">${D.categories.map(c =>
-            `<option value="${esc(c.id)}" ${c.id === p.category ? 'selected' : ''}>${esc(c.icon || '')} ${esc(c.name)}</option>`).join('')}</select>
-        </div>
+    md.innerHTML = `
+      <div style="position:relative;padding:18px 22px 12px;border-bottom:1px solid #f3d1e4;background:#fff;flex-shrink:0">
+        <button class="x" id="emx">×</button>
+        <h2 style="margin:0;color:var(--pink);font-size:1.35rem">${isNew ? 'إضافة منتج جديد' : 'تعديل المنتج'}</h2>
       </div>
 
-      <div style="margin-top:12px;padding:12px;border-radius:12px;background:#fff8fb;border:1px solid #f5d0fe">
-        <label style="margin-top:0">صورة المنتج الرئيسية</label>
-        <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap">
-          ${thumbBox(p.image, catIcon, 64)}
-          <div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:6px">
-            <div class="row" style="gap:8px;flex-wrap:wrap">
-              <input type="file" id="fimgFile" accept="image/*" style="display:none">
-              <button type="button" class="btn sec sm" id="fimgPick">📁 رفع صورة من الجهاز</button>
-              ${p.image ? `<button type="button" class="btn danger sm" id="fimgClear">إزالة الصورة</button>` : ''}
-            </div>
-            <input type="text" id="fimg" value="${esc(p.image)}" placeholder="images/... أو رابط صورة مباشر" style="width:100%;box-sizing:border-box">
-          </div>
-        </div>
-      </div>
-
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:12px;opacity:${hasVariants ? '0.6' : '1'}">
-        <div>
-          <label for="fp">السعر الأساسي ${hasVariants ? '(يُحسب من الأنواع)' : ''}</label>
-          <input type="number" id="fp" value="${esc(p.price)}" ${hasVariants ? 'disabled' : ''} style="width:100%;box-sizing:border-box">
-        </div>
-        <div>
-          <label for="fdisc">نسبة الخصم %</label>
-          <input type="number" id="fdisc" min="0" max="99" value="${esc(p.discount)}" style="width:100%;box-sizing:border-box">
-        </div>
-        <div>
-          <label for="fstock">الكمية (فارغ = غير محدود)</label>
-          <input type="number" id="fstock" min="0" value="${p.stock ?? ''}" ${hasVariants ? 'disabled' : ''} placeholder="غير محدود" style="width:100%;box-sizing:border-box">
-        </div>
-      </div>
-
-      ${!hasVariants ? `<label style="display:inline-flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer">
-        <input type="checkbox" id="finstock" ${p.inStock ? 'checked' : ''} ${p.stock !== null ? 'disabled' : ''}>
-        متوفر للبيع ${p.stock !== null ? '(يُحدد تلقائياً من الكمية)' : ''}
-      </label>` : ''}
-
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:12px">
-        <div>
-          <label for="fd">الوصف</label>
-          <textarea id="fd" rows="3" style="width:100%;box-sizing:border-box">${esc(p.description)}</textarea>
-        </div>
-        <div>
-          <label for="fsp">المواصفات</label>
-          <textarea id="fsp" rows="3" style="width:100%;box-sizing:border-box">${esc(p.specs)}</textarea>
-        </div>
-        <div>
-          <label for="fus">طريقة الاستخدام</label>
-          <textarea id="fus" rows="3" style="width:100%;box-sizing:border-box">${esc(p.usage)}</textarea>
-        </div>
-      </div>
-
-      <div style="margin-top:18px;padding-top:14px;border-top:2px solid #fce7f3">
-        <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+      <div id="epBody" style="flex:1;overflow-y:auto;padding:18px 22px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
           <div>
-            <strong style="font-size:1.05rem;color:var(--pink)">أنواع المنتج (${p.variants.length})</strong>
-            <div style="font-size:12.5px;color:#666">أضيفي درجات الألوان أو الأحجام أو الأنواع المختلفة مع صورة وسعر وكمية لكل نوع</div>
+            <label for="fn">اسم المنتج</label>
+            <input type="text" id="fn" value="${esc(p.name)}" placeholder="اسم المنتج" style="width:100%;box-sizing:border-box">
           </div>
-          <div class="row" style="gap:8px;flex-wrap:wrap">
-            ${p.variants.length > 0 ? `<button type="button" class="btn sec sm" id="splitAllBtn" style="background:#eef6ff;color:#1d4ed8;border:1px solid #bfdbfe">↗ فصل الكل لمنتجات مستقلة</button>` : ''}
-            <button type="button" class="btn sm" id="addVarBtn">+ إضافة نوع جديد</button>
+          <div>
+            <label for="fc">القسم</label>
+            <select id="fc" style="width:100%;box-sizing:border-box">${D.categories.map(c =>
+              `<option value="${esc(c.id)}" ${c.id === p.category ? 'selected' : ''}>${esc(c.icon || '')} ${esc(c.name)}</option>`).join('')}</select>
           </div>
         </div>
 
-        <div style="display:flex;flex-direction:column;gap:12px">
-          ${p.variants.length ? p.variants.map((v, i) => `
-            <div style="border:1px solid #f3d1e4;background:#fffafd;border-radius:14px;padding:12px">
-              <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px">
-                <strong style="color:var(--pink);font-size:14px">النوع #${i + 1}${v.name ? ': ' + esc(v.name) : ''}</strong>
-                <div class="row" style="gap:6px">
-                  <button type="button" class="btn sec sm" data-vsplit="${i}" title="تحويل هذا النوع إلى منتج مستقل">↗ فصل كمنتج</button>
-                  <button type="button" class="btn danger sm" data-vdel="${i}">حذف</button>
-                </div>
+        <div style="margin-top:12px;padding:12px;border-radius:12px;background:#fff8fb;border:1px solid #f5d0fe">
+          <label style="margin-top:0">صورة المنتج الرئيسية</label>
+          <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap">
+            ${thumbBox(p.image, catIcon, 64)}
+            <div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:6px">
+              <div class="row" style="gap:8px;flex-wrap:wrap">
+                <input type="file" id="fimgFile" accept="image/*" style="display:none">
+                <button type="button" class="btn sec sm" id="fimgPick">📁 رفع صورة من الجهاز</button>
+                ${p.image ? `<button type="button" class="btn danger sm" id="fimgClear">إزالة الصورة</button>` : ''}
               </div>
-
-              <div class="row" style="gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
-                ${thumbBox(v.image || p.image, '🎨', 56)}
-                <div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:6px">
-                  <div class="row" style="gap:6px;flex-wrap:wrap">
-                    <input type="file" accept="image/*" data-vfile="${i}" style="display:none">
-                    <button type="button" class="btn sec sm" data-vpick="${i}">📁 رفع صورة النوع</button>
-                    ${v.image ? `<button type="button" class="btn danger sm" data-vclearimg="${i}">إزالة الصورة</button>` : ''}
-                  </div>
-                  <input type="text" data-vimg="${i}" value="${esc(v.image || '')}" placeholder="صورة النوع (اتركيه فارغاً لاستخدام الصورة الرئيسية)" style="width:100%;box-sizing:border-box;font-size:13px">
-                </div>
-              </div>
-
-              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px">
-                <div>
-                  <label style="font-size:12px">اسم النوع *</label>
-                  <input type="text" data-vn="${i}" value="${esc(v.name)}" placeholder="مثال: 01 وردي / 500 مل" style="width:100%;box-sizing:border-box">
-                </div>
-                <div>
-                  <label style="font-size:12px">سعر النوع *</label>
-                  <input type="number" data-vp="${i}" value="${esc(v.price)}" style="width:100%;box-sizing:border-box">
-                </div>
-                <div>
-                  <label style="font-size:12px">خصم النوع %</label>
-                  <input type="number" data-vd="${i}" min="0" max="99" value="${esc(v.discount || 0)}" style="width:100%;box-sizing:border-box">
-                </div>
-                <div>
-                  <label style="font-size:12px">الكمية (فارغ = مفتوح)</label>
-                  <input type="number" data-vst="${i}" min="0" value="${v.stock ?? ''}" placeholder="غير محدود" style="width:100%;box-sizing:border-box">
-                </div>
-              </div>
-
-              <label style="display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:13px;cursor:pointer">
-                <input type="checkbox" data-vs="${i}" ${v.inStock !== false ? 'checked' : ''} ${v.stock !== null ? 'disabled' : ''}>
-                متوفر للبيع ${v.stock !== null ? '(حسب الكمية)' : ''}
-              </label>
-
-              <details style="margin-top:8px">
-                <summary style="cursor:pointer;font-size:12.5px;color:#666;font-weight:600">تفاصيل إضافية خاصة بهذا النوع (اختياري)</summary>
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-top:8px">
-                  <div>
-                    <label style="font-size:12px">وصف النوع</label>
-                    <textarea data-vdsc="${i}" rows="2" style="width:100%;box-sizing:border-box">${esc(v.description || '')}</textarea>
-                  </div>
-                  <div>
-                    <label style="font-size:12px">مواصفات النوع</label>
-                    <textarea data-vsp="${i}" rows="2" style="width:100%;box-sizing:border-box">${esc(v.specs || '')}</textarea>
-                  </div>
-                  <div>
-                    <label style="font-size:12px">طريقة استخدام النوع</label>
-                    <textarea data-vus="${i}" rows="2" style="width:100%;box-sizing:border-box">${esc(v.usage || '')}</textarea>
-                  </div>
-                </div>
-              </details>
+              <input type="text" id="fimg" value="${esc(p.image)}" placeholder="images/... أو رابط صورة مباشر" style="width:100%;box-sizing:border-box">
             </div>
-          `).join('') : '<div class="empty" style="padding:14px">لا توجد أنواع مضافة — المنتج يُباع كقطعة واحدة بالسعر الأساسي أعلاه</div>'}
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:12px;opacity:${hasVariants ? '0.6' : '1'}">
+          <div>
+            <label for="fp">السعر الأساسي ${hasVariants ? '(يُحسب من الأنواع)' : ''}</label>
+            <input type="number" id="fp" value="${esc(p.price)}" ${hasVariants ? 'disabled' : ''} style="width:100%;box-sizing:border-box">
+          </div>
+          <div>
+            <label for="fdisc">نسبة الخصم %</label>
+            <input type="number" id="fdisc" min="0" max="99" value="${esc(p.discount)}" style="width:100%;box-sizing:border-box">
+          </div>
+          <div>
+            <label for="fstock">الكمية (فارغ = غير محدود)</label>
+            <input type="number" id="fstock" min="0" value="${p.stock ?? ''}" ${hasVariants ? 'disabled' : ''} placeholder="غير محدود" style="width:100%;box-sizing:border-box">
+          </div>
+        </div>
+
+        ${!hasVariants ? `<label style="display:inline-flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer">
+          <input type="checkbox" id="finstock" ${p.inStock ? 'checked' : ''} ${p.stock !== null ? 'disabled' : ''}>
+          متوفر للبيع ${p.stock !== null ? '(يُحدد تلقائياً من الكمية)' : ''}
+        </label>` : ''}
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:12px">
+          <div>
+            <label for="fd">الوصف</label>
+            <textarea id="fd" rows="3" style="width:100%;box-sizing:border-box">${esc(p.description)}</textarea>
+          </div>
+          <div>
+            <label for="fsp">المواصفات</label>
+            <textarea id="fsp" rows="3" style="width:100%;box-sizing:border-box">${esc(p.specs)}</textarea>
+          </div>
+          <div>
+            <label for="fus">طريقة الاستخدام</label>
+            <textarea id="fus" rows="3" style="width:100%;box-sizing:border-box">${esc(p.usage)}</textarea>
+          </div>
+        </div>
+
+        <div style="margin-top:18px;padding-top:14px;border-top:2px solid #fce7f3">
+          <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+            <div>
+              <strong style="font-size:1.05rem;color:var(--pink)">أنواع المنتج (${p.variants.length})</strong>
+              <div style="font-size:12.5px;color:#666">أضيفي درجات الألوان أو الأحجام أو الأنواع المختلفة مع صورة وسعر وكمية لكل نوع</div>
+            </div>
+            <div class="row" style="gap:8px;flex-wrap:wrap">
+              ${p.variants.length > 0 ? `<button type="button" class="btn sec sm" id="splitAllBtn" style="background:#eef6ff;color:#1d4ed8;border:1px solid #bfdbfe">↗ فصل الكل لمنتجات مستقلة</button>` : ''}
+              <button type="button" class="btn sm" id="addVarBtn">+ إضافة نوع جديد</button>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px">
+            ${p.variants.length ? p.variants.map((v, i) => `
+              <div style="border:1px solid #f3d1e4;background:#fffafd;border-radius:14px;padding:12px">
+                <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px">
+                  <strong style="color:var(--pink);font-size:14px">النوع #${i + 1}${v.name ? ': ' + esc(v.name) : ''}</strong>
+                  <div class="row" style="gap:6px">
+                    <button type="button" class="btn sec sm" data-vsplit="${i}" title="تحويل هذا النوع إلى منتج مستقل">↗ فصل كمنتج</button>
+                    <button type="button" class="btn danger sm" data-vdel="${i}">حذف</button>
+                  </div>
+                </div>
+
+                <div class="row" style="gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+                  ${thumbBox(v.image || p.image, '🎨', 56)}
+                  <div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:6px">
+                    <div class="row" style="gap:6px;flex-wrap:wrap">
+                      <input type="file" accept="image/*" data-vfile="${i}" style="display:none">
+                      <button type="button" class="btn sec sm" data-vpick="${i}">📁 رفع صورة النوع</button>
+                      ${v.image ? `<button type="button" class="btn danger sm" data-vclearimg="${i}">إزالة الصورة</button>` : ''}
+                    </div>
+                    <input type="text" data-vimg="${i}" value="${esc(v.image || '')}" placeholder="صورة النوع (اتركيه فارغاً لاستخدام الصورة الرئيسية)" style="width:100%;box-sizing:border-box;font-size:13px">
+                  </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px">
+                  <div>
+                    <label style="font-size:12px">اسم النوع *</label>
+                    <input type="text" data-vn="${i}" value="${esc(v.name)}" placeholder="مثال: 01 وردي / 500 مل" style="width:100%;box-sizing:border-box">
+                  </div>
+                  <div>
+                    <label style="font-size:12px">سعر النوع *</label>
+                    <input type="number" data-vp="${i}" value="${esc(v.price)}" style="width:100%;box-sizing:border-box">
+                  </div>
+                  <div>
+                    <label style="font-size:12px">خصم النوع %</label>
+                    <input type="number" data-vd="${i}" min="0" max="99" value="${esc(v.discount || 0)}" style="width:100%;box-sizing:border-box">
+                  </div>
+                  <div>
+                    <label style="font-size:12px">الكمية (فارغ = مفتوح)</label>
+                    <input type="number" data-vst="${i}" min="0" value="${v.stock ?? ''}" placeholder="غير محدود" style="width:100%;box-sizing:border-box">
+                  </div>
+                </div>
+
+                <label style="display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:13px;cursor:pointer">
+                  <input type="checkbox" data-vs="${i}" ${v.inStock !== false ? 'checked' : ''} ${v.stock !== null ? 'disabled' : ''}>
+                  متوفر للبيع ${v.stock !== null ? '(حسب الكمية)' : ''}
+                </label>
+
+                <details style="margin-top:8px">
+                  <summary style="cursor:pointer;font-size:12.5px;color:#666;font-weight:600">تفاصيل إضافية خاصة بهذا النوع (اختياري)</summary>
+                  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-top:8px">
+                    <div>
+                      <label style="font-size:12px">وصف النوع</label>
+                      <textarea data-vdsc="${i}" rows="2" style="width:100%;box-sizing:border-box">${esc(v.description || '')}</textarea>
+                    </div>
+                    <div>
+                      <label style="font-size:12px">مواصفات النوع</label>
+                      <textarea data-vsp="${i}" rows="2" style="width:100%;box-sizing:border-box">${esc(v.specs || '')}</textarea>
+                    </div>
+                    <div>
+                      <label style="font-size:12px">طريقة استخدام النوع</label>
+                      <textarea data-vus="${i}" rows="2" style="width:100%;box-sizing:border-box">${esc(v.usage || '')}</textarea>
+                    </div>
+                  </div>
+                </details>
+              </div>
+            `).join('') : '<div class="empty" style="padding:14px">لا توجد أنواع مضافة — المنتج يُباع كقطعة واحدة بالسعر الأساسي أعلاه</div>'}
+          </div>
         </div>
       </div>
 
-      <div class="row" style="margin-top:18px;justify-content:flex-end;gap:10px">
+      <div id="epFooter" style="position:sticky;bottom:0;z-index:5;padding:12px 22px;border-top:1px solid #f3d1e4;background:#fff;display:flex;justify-content:flex-end;gap:10px;flex-shrink:0">
         <button type="button" class="btn sec" id="ecancel">إلغاء</button>
         <button type="button" class="btn" id="esave">تأكيد</button>
-      </div>`;
+      </div>
+    `;
+
+    const bodyEl = md.querySelector('#epBody');
+    if (bodyEl && prevScroll > 0) bodyEl.scrollTop = prevScroll;
 
     md.querySelector('#emx').onclick = md.querySelector('#ecancel').onclick = closeModal;
 
