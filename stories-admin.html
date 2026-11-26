@@ -133,7 +133,7 @@
       <div class="row" style="justify-content: space-between;">
         <div>
           <h1>🎬 إضافة الستوريات بضغطة زر — L'DORA Viva</h1>
-          <div class="muted">عند اختيار منتج أو رفع صورة/فيديو، تُلتقط صورة المنشور/المشهد تلقائياً لتكون غلاف الستوري.</div>
+          <div class="muted">اختر المنتج ونوعه المحدد، أو ارفع صورة/فيديو من جهازك، وانشره مباشرة إلى GitHub.</div>
         </div>
         <div class="row">
           <button class="btn" id="addStoryBtn" type="button">+ ستوري جديد</button>
@@ -312,10 +312,37 @@
       toast("تم تجهيز الملف: " + safeName);
     }
 
-    function extractProductImage(p) {
-      const raw = p.image || p.img || p.photo || p.thumbnail || p.cover ||
-        (Array.isArray(p.images) ? p.images[0] : "");
+    function extractProductImage(obj, fallback = "") {
+      if (!obj || typeof obj !== "object") return fallback;
+      const raw = obj.image || obj.img || obj.photo || obj.thumbnail || obj.cover ||
+        (Array.isArray(obj.images) ? obj.images[0] : "") || fallback;
       return String(raw || "").trim();
+    }
+
+    function normalizeVariants(rawProduct, defaultImg) {
+      const rawList =
+        (Array.isArray(rawProduct.variants) && rawProduct.variants) ||
+        (Array.isArray(rawProduct.options) && rawProduct.options) ||
+        (Array.isArray(rawProduct.types) && rawProduct.types) ||
+        (Array.isArray(rawProduct.items) && rawProduct.items) ||
+        [];
+
+      return rawList.map((v, idx) => {
+        if (typeof v === "string") {
+          return {
+            id: v,
+            name: v,
+            image: defaultImg
+          };
+        }
+        const vId = String(v.id ?? v.variant_id ?? v.sku ?? v.value ?? v.name ?? v.title ?? v.label ?? (idx + 1));
+        const vName = String(v.name ?? v.title ?? v.label ?? v.variant ?? v.option ?? v.type ?? v.color ?? v.size ?? vId);
+        return {
+          id: vId,
+          name: vName,
+          image: extractProductImage(v, defaultImg)
+        };
+      });
     }
 
     async function loadStore() {
@@ -324,16 +351,31 @@
         if (!r.ok) return;
         const d = await r.json();
         const arr = Array.isArray(d) ? d : (Array.isArray(d.products) ? d.products : []);
-        products = arr.map((p, i) => ({
-          id: String(p.id ?? p.product_id ?? i + 1),
-          name: String(p.title ?? p.name ?? p.product_name ?? ("منتج #" + (i + 1))),
-          image: extractProductImage(p)
-        }));
+        products = arr.map((p, i) => {
+          const baseImg = extractProductImage(p, "");
+          return {
+            id: String(p.id ?? p.product_id ?? i + 1),
+            name: String(p.title ?? p.name ?? p.product_name ?? ("منتج #" + (i + 1))),
+            image: baseImg,
+            variants: normalizeVariants(p, baseImg)
+          };
+        });
       } catch {}
     }
 
     function getProductById(id) {
-      return products.find(p => String(p.id) === String(id));
+      return products.find(p => String(p.id) === String(id)) || null;
+    }
+
+    function getVariantById(prod, variantId) {
+      if (!prod || !Array.isArray(prod.variants) || !variantId) return null;
+      return prod.variants.find(v => String(v.id) === String(variantId)) || null;
+    }
+
+    function getSlideTargetImage(sl) {
+      const prod = sl?.productId ? getProductById(sl.productId) : null;
+      const variant = (prod && sl?.variantId) ? getVariantById(prod, sl.variantId) : null;
+      return (variant && variant.image) || (prod && prod.image) || "";
     }
 
     function resolveStoryCover(st) {
@@ -343,10 +385,8 @@
       if (firstSlide) {
         if (firstSlide._previewPoster) return firstSlide._previewPoster;
         if (firstSlide.poster) return firstSlide.poster;
-        if (firstSlide.productId) {
-          const prod = getProductById(firstSlide.productId);
-          if (prod && prod.image) return prod.image;
-        }
+        const targetImg = getSlideTargetImage(firstSlide);
+        if (targetImg) return targetImg;
         if (firstSlide._previewUrl && firstSlide.type !== "video") return firstSlide._previewUrl;
         const m = firstSlide.media || firstSlide.image || "";
         if (m && !/\.(mp4|webm|mov)(\?.*)?$/i.test(m) && firstSlide.type !== "video") {
@@ -373,7 +413,7 @@
         id: "offers-today",
         title: "عروض اليوم 🔥",
         cover: "",
-        slides: [{ media: "icon-512.png", caption: "أحدث العروض والمنتجات من L'DORA Viva", productId: "" }]
+        slides: [{ media: "icon-512.png", caption: "أحدث العروض والمنتجات من L'DORA Viva", productId: "", variantId: "", variantName: "" }]
       }];
       render();
     }
@@ -381,7 +421,18 @@
     function prodOptions(selId) {
       let html = `<option value="">-- بدون ربط بمنتج --</option>`;
       for (const p of products) {
-        html += `<option value="${p.id}" ${String(p.id) === String(selId) ? "selected" : ""}>${p.name}</option>`;
+        html += `<option value="${esc(p.id)}" ${String(p.id) === String(selId) ? "selected" : ""}>${esc(p.name)}</option>`;
+      }
+      return html;
+    }
+
+    function variantOptions(prod, selVariantId) {
+      if (!prod || !Array.isArray(prod.variants) || !prod.variants.length) {
+        return `<option value="">-- لا توجد أنواع لهذا المنتج --</option>`;
+      }
+      let html = `<option value="">-- اختر النوع --</option>`;
+      for (const v of prod.variants) {
+        html += `<option value="${esc(v.id)}" ${String(v.id) === String(selVariantId) ? "selected" : ""}>${esc(v.name)}</option>`;
       }
       return html;
     }
@@ -393,6 +444,9 @@
     window.onProductSelect = (sIdx, slIdx, prodId) => {
       const sl = stories[sIdx].slides[slIdx];
       sl.productId = prodId;
+      sl.variantId = "";
+      sl.variantName = "";
+
       const prod = getProductById(prodId);
       if (prod && prod.image) {
         const currentMedia = sl.media || sl.image || "";
@@ -405,6 +459,32 @@
           stories[sIdx].cover = prod.image;
         }
       }
+      activeStory = sIdx;
+      activeSlide = slIdx;
+      render();
+    };
+
+    window.onVariantSelect = (sIdx, slIdx, variantId) => {
+      const sl = stories[sIdx].slides[slIdx];
+      const prod = getProductById(sl.productId);
+      const variant = getVariantById(prod, variantId);
+
+      sl.variantId = variantId;
+      sl.variantName = variant ? variant.name : "";
+
+      const img = (variant && variant.image) || (prod && prod.image) || "";
+      if (img) {
+        const currentMedia = sl.media || sl.image || "";
+        if (!currentMedia || currentMedia === "icon-512.png" || sl._autoFromProduct) {
+          sl.media = img;
+          sl.type = "image";
+          sl._autoFromProduct = true;
+        }
+        if (!stories[sIdx].cover || stories[sIdx].cover === "icon-512.png") {
+          stories[sIdx].cover = img;
+        }
+      }
+
       activeStory = sIdx;
       activeSlide = slIdx;
       render();
@@ -443,6 +523,8 @@
 
             ${(st.slides || []).map((sl, slIdx) => {
               const mediaVal = sl.media || sl.image || "";
+              const prod = sl.productId ? getProductById(sl.productId) : null;
+              const hasVariants = Boolean(prod && Array.isArray(prod.variants) && prod.variants.length);
               return `
                 <div class="slide-item">
                   <div class="row" style="justify-content: space-between; margin-bottom: 6px;">
@@ -454,17 +536,23 @@
                   </div>
                   <div class="grid-2">
                     <div>
-                      <label>ربط بمنتج/منشور (يلتقط صورته تلقائياً)</label>
+                      <label>ربط بمنتج/منشور</label>
                       <select onchange="onProductSelect(${sIdx}, ${slIdx}, this.value)">
                         ${prodOptions(sl.productId)}
                       </select>
                     </div>
                     <div>
-                      <label>أو ارفع صورة / فيديو من جهازك</label>
-                      <div class="row">
-                        <input type="text" style="flex: 1;" value="${esc(mediaVal)}" oninput="stories[${sIdx}].slides[${slIdx}]._autoFromProduct=false; stories[${sIdx}].slides[${slIdx}].media=this.value; activeStory=${sIdx}; activeSlide=${slIdx}; updatePreview();">
-                        <input type="file" accept="image/*,video/mp4,video/webm" style="width: auto; padding: 5px;" onchange="onSlideMediaPick(event, ${sIdx}, ${slIdx})">
-                      </div>
+                      <label>نوع المنتج (Variant)</label>
+                      <select ${hasVariants ? "" : "disabled"} onchange="onVariantSelect(${sIdx}, ${slIdx}, this.value)">
+                        ${variantOptions(prod, sl.variantId)}
+                      </select>
+                    </div>
+                  </div>
+                  <div style="margin-top: 8px;">
+                    <label>أو ارفع صورة / فيديو من جهازك</label>
+                    <div class="row">
+                      <input type="text" style="flex: 1;" value="${esc(mediaVal)}" oninput="stories[${sIdx}].slides[${slIdx}]._autoFromProduct=false; stories[${sIdx}].slides[${slIdx}].media=this.value; activeStory=${sIdx}; activeSlide=${slIdx}; updatePreview();">
+                      <input type="file" accept="image/*,video/mp4,video/webm" style="width: auto; padding: 5px;" onchange="onSlideMediaPick(event, ${sIdx}, ${slIdx})">
                     </div>
                   </div>
                   <div style="margin-top: 8px;">
@@ -541,7 +629,7 @@
     };
 
     window.addSlide = (sIdx) => {
-      stories[sIdx].slides.push({ media: "", caption: "", productId: "" });
+      stories[sIdx].slides.push({ media: "", caption: "", productId: "", variantId: "", variantName: "" });
       activeStory = sIdx;
       activeSlide = stories[sIdx].slides.length - 1;
       render();
@@ -573,11 +661,15 @@
           cover: String(cleanCover).trim(),
           slides: (st.slides || []).map(sl => {
             const prod = sl.productId ? getProductById(sl.productId) : null;
-            const m = String(sl.media || sl.image || (prod && prod.image) || cleanCover || "icon-512.png").trim();
+            const variant = (prod && sl.variantId) ? getVariantById(prod, sl.variantId) : null;
+            const targetImg = getSlideTargetImage(sl);
+            const m = String(sl.media || sl.image || targetImg || cleanCover || "icon-512.png").trim();
             const item = {
               media: m,
               caption: String(sl.caption || "").trim(),
-              productId: String(sl.productId || "").trim()
+              productId: String(sl.productId || "").trim(),
+              variantId: String(sl.variantId || "").trim(),
+              variantName: String((variant && variant.name) || sl.variantName || "").trim()
             };
             if (sl.poster && !String(sl.poster).startsWith("data:")) {
               item.poster = String(sl.poster).trim();
@@ -594,13 +686,23 @@
       const sl = st?.slides?.[activeSlide];
       const imgEl = document.getElementById("prevImg");
       const vidEl = document.getElementById("prevVid");
+      const ctaEl = document.getElementById("prevCta");
 
       document.getElementById("prevTitle").textContent = st?.title || "";
       document.getElementById("prevCaption").textContent = sl?.caption || "";
-      document.getElementById("prevCta").style.display = sl?.productId ? "inline-block" : "none";
 
-      const prod = sl?.productId ? getProductById(sl.productId) : null;
-      const src = sl?._previewUrl || sl?.media || sl?.image || (prod && prod.image) || resolveStoryCover(st) || "icon-512.png";
+      if (sl?.productId) {
+        const prod = getProductById(sl.productId);
+        const variant = (prod && sl.variantId) ? getVariantById(prod, sl.variantId) : null;
+        const vLabel = (variant && variant.name) || sl.variantName || "";
+        ctaEl.style.display = "inline-block";
+        ctaEl.textContent = vLabel ? `🛒 أضيفي للسلة (${vLabel})` : "🛒 أضيفي للسلة";
+      } else {
+        ctaEl.style.display = "none";
+      }
+
+      const targetImg = getSlideTargetImage(sl);
+      const src = sl?._previewUrl || sl?.media || sl?.image || targetImg || resolveStoryCover(st) || "icon-512.png";
       const isVid = Boolean(sl?._previewUrl && sl.type === "video") || /\.(mp4|webm|mov)(\?.*)?$/i.test(src);
 
       if (isVid) {
@@ -688,7 +790,7 @@
         id: "story-" + Date.now(),
         title: "ستوري جديد",
         cover: "",
-        slides: [{ media: "", caption: "", productId: "" }]
+        slides: [{ media: "", caption: "", productId: "", variantId: "", variantName: "" }]
       });
       activeStory = stories.length - 1;
       activeSlide = 0;
