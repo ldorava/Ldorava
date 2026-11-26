@@ -650,4 +650,54 @@ $('#cartBtn').onclick = openCart;
 $('#closeCart').onclick = () => closeCart(false);
 $('#cov').onclick = () => closeCart(false);
 
+window.addEventListener('ldorava:addToCart', (e) => {
+  const detail = e?.detail || {};
+  const pid = String(detail.productId || '').trim();
+  if (!pid) return;
+
+  const p = D.products.find(x => String(x.id) === pid);
+  if (!p) return;
+
+  let chosenVariantName = '';
+  let chosenVariantObj = null;
+
+  if (hasVariants(p)) {
+    const reqName = String(detail.variantName || '').trim();
+    const reqId = String(detail.variantId || '').trim();
+
+    if (reqName) {
+      chosenVariantObj = p.variants.find(v => String(v.name).trim() === reqName && isVariantAvailable(p, v));
+    }
+    if (!chosenVariantObj && reqId) {
+      chosenVariantObj = p.variants.find(v => String(v.id ?? v.name).trim() === reqId && isVariantAvailable(p, v));
+    }
+    if (!chosenVariantObj) {
+      chosenVariantObj = p.variants.find(v => isVariantAvailable(p, v));
+    }
+    if (!chosenVariantObj) return;
+    chosenVariantName = chosenVariantObj.name;
+  } else {
+    if (!isProductAvailable(p)) return;
+  }
+
+  const maxStock = getEffectiveStock(p, chosenVariantObj);
+  const ex = cart.find(c => String(c.pid) === pid && (c.v || '') === chosenVariantName);
+  const currentInCart = ex ? (Number(ex.q) || 0) : 0;
+
+  if (maxStock !== null && currentInCart >= maxStock) {
+    openCart();
+    return;
+  }
+
+  const nextQty = currentInCart + 1;
+  if (ex) {
+    ex.q = nextQty;
+  } else {
+    cart.push({ pid, v: chosenVariantName, q: nextQty });
+  }
+
+  saveCart();
+  openCart();
+});
+
 init();
