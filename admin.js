@@ -23,7 +23,7 @@ const parseStock = val => {
 let cfg = {};
 try { cfg = JSON.parse(localStorage.getItem('gh_cfg') || '{}'); } catch (e) {}
 let D = { settings: { name: 'المتجر', currency: '', whatsapp: '' }, categories: [], products: [] };
-let sha = null, dirty = false, tab = 'products', filterCat = 'all', filterStock = 'all';
+let sha = null, dirty = false, tab = 'products', filterCat = 'all', filterStock = 'all', searchQuery = '', sortMode = 'manual';
 const previews = {};
 
 function toast(m) {
@@ -250,6 +250,25 @@ const stockBadge = p => {
   return '';
 };
 
+const minFinalPrice = p => {
+  if (hasVar(p)) {
+    const prices = p.variants.map(v => discPrice(v.price, effectiveVarDisc(p, v)));
+    return prices.length ? Math.min(...prices) : 0;
+  }
+  return discPrice(p.price, clampDisc(p.discount || 0));
+};
+
+const totalStockValue = p => {
+  if (hasVar(p)) {
+    return p.variants.reduce((acc, v) => {
+      const st = parseStock(v.stock);
+      return acc + (st !== null ? st : 999999);
+    }, 0);
+  }
+  const st = parseStock(p.stock);
+  return st !== null ? st : 999999;
+};
+
 const priceText = p => {
   const cur = D.settings.currency || '';
   if (hasVar(p)) {
@@ -264,14 +283,36 @@ const priceText = p => {
   return `${fmt(p.price)} ${cur}${stockBadge(p)}`;
 };
 
-function viewProducts() {
-  const list = D.products.filter(p => {
+function matchesSearch(p, q) {
+  const clean = (q || '').trim().toLowerCase();
+  if (!clean) return true;
+  const catName = D.categories.find(x => x.id === p.category)?.name || '';
+  const varNames = hasVar(p) ? p.variants.map(v => v.name || '').join(' ') : '';
+  const hay = `${p.name || ''} ${catName} ${varNames}`.toLowerCase();
+  return hay.includes(clean);
+}
+
+function viewProducts(focusSearch = false) {
+  const canReorder = sortMode === 'manual' && filterCat === 'all' && filterStock === 'all' && !searchQuery.trim();
+
+  let list = D.products.filter(p => {
     const catOk = filterCat === 'all' || p.category === filterCat;
     if (!catOk) return false;
     if (filterStock === 'out') return !isProdAvail(p);
     if (filterStock === 'low') return isProdLowStock(p);
+    if (!matchesSearch(p, searchQuery)) return false;
     return true;
   });
+
+  if (sortMode === 'price_asc') {
+    list = [...list].sort((a, b) => minFinalPrice(a) - minFinalPrice(b));
+  } else if (sortMode === 'price_desc') {
+    list = [...list].sort((a, b) => minFinalPrice(b) - minFinalPrice(a));
+  } else if (sortMode === 'stock_asc') {
+    list = [...list].sort((a, b) => totalStockValue(a) - totalStockValue(b));
+  } else if (sortMode === 'newest') {
+    list = [...list].reverse();
+  }
 
   $('#view').innerHTML = `<div class="panel">
     <div class="row" style="justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
@@ -282,30 +323,104 @@ function viewProducts() {
         <button class="btn" id="addP">+ منتج جديد</button>
       </div>
     </div>
+
+    <div class="row" style="gap:8px;margin-bottom:8px;align-items:center">
+      <input type="search" id="fsearch" value="${esc(searchQuery)}" placeholder="🔍 ابحثي عن منتج أو نوع أو قسم..." style="flex:1;min-width:180px">
+      ${searchQuery ? `<button type="button" class="btn sec sm" id="clearSearchBtn" title="مسح البحث">× مسح</button>` : ''}
+    </div>
+
     <div class="row" style="gap:8px;flex-wrap:wrap">
-      <select id="fcat" style="flex:1;min-width:150px"><option value="all">كل الأقسام</option>${D.categories.map(c =>
+      <select id="fcat" style="flex:1;min-width:140px"><option value="all">كل الأقسام</option>${D.categories.map(c =>
         `<option value="${esc(c.id)}" ${c.id === filterCat ? 'selected' : ''}>${esc(c.icon || '')} ${esc(c.name)}</option>`).join('')}</select>
-      <select id="fstock" style="flex:1;min-width:150px">
+      <select id="fstock" style="flex:1;min-width:140px">
         <option value="all" ${filterStock === 'all' ? 'selected' : ''}>كل حالات المخزون</option>
         <option value="low" ${filterStock === 'low' ? 'selected' : ''}>منخفضة الكمية (3 أو أقل)</option>
         <option value="out" ${filterStock === 'out' ? 'selected' : ''}>غير متوفرة</option>
       </select>
+      <select id="fsort" style="flex:1;min-width:150px">
+        <option value="manual" ${sortMode === 'manual' ? 'selected' : ''}>الترتيب: يدوي (ترتيب المتجر)</option>
+        <option value="price_asc" ${sortMode === 'price_asc' ? 'selected' : ''}>السعر: من الأقل للأعلى</option>
+        <option value="price_desc" ${sortMode === 'price_desc' ? 'selected' : ''}>السعر: من الأعلى للأقل</option>
+        <option value="stock_asc" ${sortMode === 'stock_asc' ? 'selected' : ''}>الكمية: الأقل أولاً</option>
+        <option value="newest" ${sortMode === 'newest' ? 'selected' : ''}>الأحدث أولاً</option>
+      </select>
     </div>
+
+    ${!canReorder ? `<div style="margin-top:8px;font-size:12px;color:#666">💡 لنقل المنتجات يدوياً (↑ / ↓ / للأعلى): اختاري «الترتيب: يدوي» وامسحي البحث والفلترة.</div>` : ''}
+
     <div class="list" style="margin-top:8px">${list.length ? list.map(p => {
+      const realIdx = D.products.findIndex(x => x.id === p.id);
       const c = D.categories.find(x => x.id === p.category);
       const varImg = hasVar(p) ? p.variants.find(v => v.image)?.image : '';
       const imgSrc = p.image || varImg || '';
       const th = imgSrc ? `<img src="${esc(previews[imgSrc] || imgSrc)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">` : (c?.icon || '🛍️');
+
+      const moveControls = canReorder ? `
+        <button type="button" class="btn sec sm" data-top="${esc(p.id)}" ${realIdx <= 0 ? 'disabled' : ''} title="نقل إلى أعلى القائمة">⏫</button>
+        <button type="button" class="btn sec sm" data-up="${esc(p.id)}" ${realIdx <= 0 ? 'disabled' : ''} title="تحريك للأعلى">↑</button>
+        <button type="button" class="btn sec sm" data-dn="${esc(p.id)}" ${realIdx >= D.products.length - 1 ? 'disabled' : ''} title="تحريك للأسفل">↓</button>
+      ` : '';
+
       return `<div class="it"><div class="th" style="overflow:hidden">${th}</div>
         <div class="n">${esc(p.name)}<small>${esc(c?.name || 'بدون قسم')} · ${priceText(p)}</small></div>
+        ${moveControls}
         <button class="btn sec sm" data-e="${esc(p.id)}">تعديل</button>
         <button class="btn danger sm" data-d="${esc(p.id)}">حذف</button></div>`;
-    }).join('') : '<div class="empty">لا توجد منتجات</div>'}</div></div>`;
+    }).join('') : '<div class="empty">لا توجد منتجات مطابقة</div>'}</div></div>`;
+
+  const searchInp = $('#fsearch');
+  searchInp.oninput = e => {
+    const pos = e.target.selectionStart;
+    searchQuery = e.target.value;
+    viewProducts(true);
+    const nextInp = $('#fsearch');
+    if (nextInp) {
+      nextInp.focus();
+      if (typeof pos === 'number') nextInp.setSelectionRange(pos, pos);
+    }
+  };
+  if (focusSearch && searchInp) searchInp.focus();
+
+  $('#clearSearchBtn')?.addEventListener('click', () => {
+    searchQuery = '';
+    viewProducts(true);
+  });
+
   $('#fcat').onchange = e => { filterCat = e.target.value; viewProducts(); };
   $('#fstock').onchange = e => { filterStock = e.target.value; viewProducts(); };
+  $('#fsort').onchange = e => { sortMode = e.target.value; viewProducts(); };
   $('#mergeBtn').onclick = openMergeProductsModal;
   $('#backupBtn').onclick = exportBackup;
   $('#addP').onclick = () => editProduct(null);
+
+  $('#view').querySelectorAll('[data-top]').forEach(b => b.onclick = () => {
+    const idx = D.products.findIndex(x => x.id === b.dataset.top);
+    if (idx > 0) {
+      const [item] = D.products.splice(idx, 1);
+      D.products.unshift(item);
+      setDirty(true);
+      viewProducts();
+    }
+  });
+
+  $('#view').querySelectorAll('[data-up]').forEach(b => b.onclick = () => {
+    const idx = D.products.findIndex(x => x.id === b.dataset.up);
+    if (idx > 0) {
+      [D.products[idx - 1], D.products[idx]] = [D.products[idx], D.products[idx - 1]];
+      setDirty(true);
+      viewProducts();
+    }
+  });
+
+  $('#view').querySelectorAll('[data-dn]').forEach(b => b.onclick = () => {
+    const idx = D.products.findIndex(x => x.id === b.dataset.dn);
+    if (idx >= 0 && idx < D.products.length - 1) {
+      [D.products[idx + 1], D.products[idx]] = [D.products[idx], D.products[idx + 1]];
+      setDirty(true);
+      viewProducts();
+    }
+  });
+
   $('#view').querySelectorAll('[data-e]').forEach(b => b.onclick = () => editProduct(b.dataset.e));
   $('#view').querySelectorAll('[data-d]').forEach(b => b.onclick = () => {
     const p = D.products.find(x => x.id === b.dataset.d);
