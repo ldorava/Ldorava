@@ -1,1 +1,18 @@
-[]
+[
+  {
+    "id": "story-1795677655679",
+    "title": "شامبو للشعر الدهني",
+    "cover": "images/1795108305524.jpg",
+    "slides": [
+      {
+        "media": "data/stories-media/1795677681968-1001109032.mp4",
+        "caption": "",
+        "productId": "p1",
+        "variantId": "للشعر الدهني 300ﻣﻞ",
+        "variantName": "للشعر الدهني 300ﻣﻞ",
+        "poster": "data/stories-media/poster-1795677682296.jpg",
+        "type": "video"
+      }
+    ]
+  }
+]
