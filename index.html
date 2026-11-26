@@ -223,6 +223,31 @@
     }
     .story-tap-zones div { flex: 1; cursor: pointer; }
 
+    #scrollTopBtn {
+      display: none;
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 997;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 194, 218, 0.55);
+      background: linear-gradient(135deg, #ec4899, #d6336c);
+      color: #ffffff;
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      font-family: inherit;
+      box-shadow: 0 8px 22px rgba(214, 51, 108, 0.35);
+      transition: transform 0.15s ease;
+    }
+    #scrollTopBtn:active {
+      transform: scale(0.94);
+    }
+
     #ldorava-chat-btn {
       position: fixed;
       bottom: 20px;
@@ -421,6 +446,7 @@
     <div class="ft" id="cartFoot"></div>
   </aside>
 
+  <button id="scrollTopBtn" type="button" aria-label="العودة إلى أعلى الصفحة" title="أعلى الصفحة">↑</button>
   <button id="ldorava-chat-btn" type="button">💬 مساعد L'DORA</button>
 
   <div id="ldorava-chat-box" dir="rtl">
@@ -527,6 +553,7 @@
     }
 
     const PROXY_CHAT_URL = "https://ldorava-ai-proxy-one.vercel.app/chat";
+    const scrollTopBtn = document.getElementById("scrollTopBtn");
     const chatBtn = document.getElementById("ldorava-chat-btn");
     const chatBox = document.getElementById("ldorava-chat-box");
     const chatClose = document.getElementById("ldorava-chat-close");
@@ -541,20 +568,39 @@
     function isHomeScreenActive() {
       const drawerOpen = document.getElementById("drawer")?.classList.contains("show");
       const povOpen = document.getElementById("pov")?.classList.contains("show");
+      const covOpen = document.getElementById("cov")?.classList.contains("show");
       const shareOpen = document.getElementById("shareOv")?.classList.contains("show");
       const iosOpen = iosOv && window.getComputedStyle(iosOv).display !== "none";
       const storyOpen = storyViewerEl && window.getComputedStyle(storyViewerEl).display !== "none";
-      return !(drawerOpen || povOpen || shareOpen || iosOpen || storyOpen);
+      return !(drawerOpen || povOpen || covOpen || shareOpen || iosOpen || storyOpen);
+    }
+
+    function syncScrollTopVisibility() {
+      if (!scrollTopBtn) return;
+      const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      const shouldShow = isHomeScreenActive() && scrollY > 240;
+      scrollTopBtn.style.display = shouldShow ? "flex" : "none";
     }
 
     function syncAssistantVisibility() {
-      if (!chatBtn || !chatBox) return;
-      if (!isHomeScreenActive()) {
-        chatBtn.style.display = "none";
-        chatBox.style.display = "none";
-      } else {
-        chatBtn.style.display = "inline-block";
+      const onHome = isHomeScreenActive();
+      if (chatBtn && chatBox) {
+        if (!onHome) {
+          chatBtn.style.display = "none";
+          chatBox.style.display = "none";
+        } else {
+          chatBtn.style.display = "inline-block";
+        }
       }
+      syncScrollTopVisibility();
+    }
+
+    if (scrollTopBtn) {
+      scrollTopBtn.addEventListener("click", () => {
+        if (!isHomeScreenActive()) return;
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+      window.addEventListener("scroll", syncScrollTopVisibility, { passive: true });
     }
 
     if (chatBtn && chatBox) {
@@ -621,7 +667,7 @@
     }
 
     const overlayObserver = new MutationObserver(syncAssistantVisibility);
-    ["drawer", "pov", "shareOv", "iosInstallOv", "storyViewer"].forEach((id) => {
+    ["drawer", "pov", "cov", "shareOv", "iosInstallOv", "storyViewer"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) {
         overlayObserver.observe(el, { attributes: true, attributeFilter: ["class", "style"] });
