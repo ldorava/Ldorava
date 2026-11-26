@@ -133,7 +133,7 @@
       <div class="row" style="justify-content: space-between;">
         <div>
           <h1>🎬 إضافة الستوريات بضغطة زر — L'DORA Viva</h1>
-          <div class="muted">اختر صورة أو فيديو من جهازك، اكتب النص، وانشره مباشرة إلى GitHub مع تحديث <code>data/stories.json</code> تلقائياً.</div>
+          <div class="muted">عند اختيار منتج أو رفع صورة/فيديو، تُلتقط صورة المنشور/المشهد تلقائياً لتكون غلاف الستوري.</div>
         </div>
         <div class="row">
           <button class="btn" id="addStoryBtn" type="button">+ ستوري جديد</button>
@@ -255,6 +255,37 @@
       });
     }
 
+    function captureVideoPosterBase64(videoDataUrl) {
+      return new Promise((resolve) => {
+        try {
+          const v = document.createElement("video");
+          v.muted = true;
+          v.playsInline = true;
+          v.src = videoDataUrl;
+          v.addEventListener("loadeddata", () => {
+            v.currentTime = 0.1;
+          }, { once: true });
+          v.addEventListener("seeked", () => {
+            try {
+              const canvas = document.createElement("canvas");
+              canvas.width = v.videoWidth || 480;
+              canvas.height = v.videoHeight || 640;
+              const ctx = canvas.getContext("2d");
+              ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+              const jpgUrl = canvas.toDataURL("image/jpeg", 0.82);
+              const idx = jpgUrl.indexOf(",");
+              resolve({ base64: idx >= 0 ? jpgUrl.slice(idx + 1) : "", dataUrl: jpgUrl });
+            } catch {
+              resolve(null);
+            }
+          }, { once: true });
+          v.addEventListener("error", () => resolve(null), { once: true });
+        } catch {
+          resolve(null);
+        }
+      });
+    }
+
     async function handleFileUpload(file, onAssigned) {
       if (!file) return;
       saveGhPrefs();
@@ -263,11 +294,28 @@
       const repoPath = `${dir}/${safeName}`;
 
       const { base64, dataUrl } = await fileToBase64(file);
-      pendingUploads[repoPath] = { base64, dataUrl, isVideo: file.type.startsWith("video/") };
-      updatePendingBadge();
+      const isVideo = file.type.startsWith("video/");
+      pendingUploads[repoPath] = { base64, dataUrl, isVideo };
 
-      onAssigned(repoPath, dataUrl, file.type.startsWith("video/"));
+      let posterInfo = null;
+      if (isVideo) {
+        const snap = await captureVideoPosterBase64(dataUrl);
+        if (snap && snap.base64) {
+          const posterPath = `${dir}/poster-${Date.now()}.jpg`;
+          pendingUploads[posterPath] = { base64: snap.base64, dataUrl: snap.dataUrl, isVideo: false };
+          posterInfo = { repoPath: posterPath, dataUrl: snap.dataUrl };
+        }
+      }
+
+      updatePendingBadge();
+      onAssigned(repoPath, dataUrl, isVideo, posterInfo);
       toast("تم تجهيز الملف: " + safeName);
+    }
+
+    function extractProductImage(p) {
+      const raw = p.image || p.img || p.photo || p.thumbnail || p.cover ||
+        (Array.isArray(p.images) ? p.images[0] : "");
+      return String(raw || "").trim();
     }
 
     async function loadStore() {
@@ -278,9 +326,34 @@
         const arr = Array.isArray(d) ? d : (Array.isArray(d.products) ? d.products : []);
         products = arr.map((p, i) => ({
           id: String(p.id ?? p.product_id ?? i + 1),
-          name: String(p.title ?? p.name ?? p.product_name ?? ("منتج #" + (i + 1)))
+          name: String(p.title ?? p.name ?? p.product_name ?? ("منتج #" + (i + 1))),
+          image: extractProductImage(p)
         }));
       } catch {}
+    }
+
+    function getProductById(id) {
+      return products.find(p => String(p.id) === String(id));
+    }
+
+    function resolveStoryCover(st) {
+      if (st._previewCover) return st._previewCover;
+      if (st.cover && st.cover !== "icon-512.png" && st.cover.trim() !== "") return st.cover;
+      const firstSlide = st.slides?.[0];
+      if (firstSlide) {
+        if (firstSlide._previewPoster) return firstSlide._previewPoster;
+        if (firstSlide.poster) return firstSlide.poster;
+        if (firstSlide.productId) {
+          const prod = getProductById(firstSlide.productId);
+          if (prod && prod.image) return prod.image;
+        }
+        if (firstSlide._previewUrl && firstSlide.type !== "video") return firstSlide._previewUrl;
+        const m = firstSlide.media || firstSlide.image || "";
+        if (m && !/\.(mp4|webm|mov)(\?.*)?$/i.test(m) && firstSlide.type !== "video") {
+          return m;
+        }
+      }
+      return st.cover || "icon-512.png";
     }
 
     async function loadStories() {
@@ -299,14 +372,14 @@
       stories = [{
         id: "offers-today",
         title: "عروض اليوم 🔥",
-        cover: "icon-512.png",
+        cover: "",
         slides: [{ media: "icon-512.png", caption: "أحدث العروض والمنتجات من L'DORA Viva", productId: "" }]
       }];
       render();
     }
 
     function prodOptions(selId) {
-      let html = `<option value="">-- بدون زر شراء --</option>`;
+      let html = `<option value="">-- بدون ربط بمنتج --</option>`;
       for (const p of products) {
         html += `<option value="${p.id}" ${String(p.id) === String(selId) ? "selected" : ""}>${p.name}</option>`;
       }
@@ -317,67 +390,93 @@
       return String(s ?? "").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     }
 
-    function render() {
-      editorEl.innerHTML = stories.map((st, sIdx) => `
-        <div class="box">
-          <div class="row" style="justify-content: space-between; margin-bottom: 10px;">
-            <strong>${esc(st.title || ("ستوري " + (sIdx + 1)))}</strong>
-            <div class="row">
-              <button class="btn sec sm" type="button" onclick="resetSingleStory(${sIdx})" title="إعادة ضبط عداد 42 ساعة لهذا الستوري فقط">🔄 إعادة الستوري</button>
-              <button class="btn sec sm" type="button" onclick="addSlide(${sIdx})">+ شريحة</button>
-              <button class="btn danger sm" type="button" onclick="delStory(${sIdx})">حذف</button>
-            </div>
-          </div>
+    window.onProductSelect = (sIdx, slIdx, prodId) => {
+      const sl = stories[sIdx].slides[slIdx];
+      sl.productId = prodId;
+      const prod = getProductById(prodId);
+      if (prod && prod.image) {
+        const currentMedia = sl.media || sl.image || "";
+        if (!currentMedia || currentMedia === "icon-512.png" || sl._autoFromProduct) {
+          sl.media = prod.image;
+          sl.type = "image";
+          sl._autoFromProduct = true;
+        }
+        if (!stories[sIdx].cover || stories[sIdx].cover === "icon-512.png") {
+          stories[sIdx].cover = prod.image;
+        }
+      }
+      activeStory = sIdx;
+      activeSlide = slIdx;
+      render();
+    };
 
-          <div class="grid-2">
-            <div>
-              <label>عنوان الستوري</label>
-              <input type="text" value="${esc(st.title)}" oninput="stories[${sIdx}].title=this.value; activeStory=${sIdx}; updatePreview();">
-            </div>
-            <div>
-              <label>صورة الغلاف (رفع من الجهاز أو مسار)</label>
+    function render() {
+      editorEl.innerHTML = stories.map((st, sIdx) => {
+        const autoCover = resolveStoryCover(st);
+        return `
+          <div class="box">
+            <div class="row" style="justify-content: space-between; margin-bottom: 10px;">
               <div class="row">
-                <input type="text" style="flex: 1;" value="${esc(st.cover)}" oninput="stories[${sIdx}].cover=this.value; updatePreview();">
-                <input type="file" accept="image/*" style="width: auto; padding: 5px;" onchange="onCoverPick(event, ${sIdx})">
+                <img src="${esc(autoCover)}" alt="" style="width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 2px solid var(--pink);">
+                <strong>${esc(st.title || ("ستوري " + (sIdx + 1)))}</strong>
+              </div>
+              <div class="row">
+                <button class="btn sec sm" type="button" onclick="resetSingleStory(${sIdx})" title="إعادة ضبط عداد 42 ساعة لهذا الستوري فقط">🔄 إعادة الستوري</button>
+                <button class="btn sec sm" type="button" onclick="addSlide(${sIdx})">+ شريحة</button>
+                <button class="btn danger sm" type="button" onclick="delStory(${sIdx})">حذف</button>
               </div>
             </div>
-          </div>
 
-          ${(st.slides || []).map((sl, slIdx) => {
-            const mediaVal = sl.media || sl.image || "";
-            return `
-              <div class="slide-item">
-                <div class="row" style="justify-content: space-between; margin-bottom: 6px;">
-                  <strong style="color: var(--pink); font-size: 0.85rem;">شريحة ${slIdx + 1}</strong>
-                  <div class="row">
-                    <button class="btn sec sm" type="button" onclick="activeStory=${sIdx}; activeSlide=${slIdx}; updatePreview();">معاينة</button>
-                    ${st.slides.length > 1 ? `<button class="btn danger sm" type="button" onclick="delSlide(${sIdx},${slIdx})">إزالة</button>` : ""}
-                  </div>
+            <div class="grid-2">
+              <div>
+                <label>عنوان الستوري</label>
+                <input type="text" value="${esc(st.title)}" oninput="stories[${sIdx}].title=this.value; activeStory=${sIdx}; updatePreview();">
+              </div>
+              <div>
+                <label>غلاف تلقائي من المنشور/الفيديو (أو اختر صورة غلاف مخصصة)</label>
+                <div class="row">
+                  <input type="text" style="flex: 1;" placeholder="تلقائي من صورة المنشور أو الفيديو" value="${esc(st.cover)}" oninput="stories[${sIdx}].cover=this.value; render();">
+                  <input type="file" accept="image/*" style="width: auto; padding: 5px;" onchange="onCoverPick(event, ${sIdx})">
                 </div>
-                <div class="grid-2">
-                  <div>
-                    <label>صورة أو فيديو الشريحة</label>
+              </div>
+            </div>
+
+            ${(st.slides || []).map((sl, slIdx) => {
+              const mediaVal = sl.media || sl.image || "";
+              return `
+                <div class="slide-item">
+                  <div class="row" style="justify-content: space-between; margin-bottom: 6px;">
+                    <strong style="color: var(--pink); font-size: 0.85rem;">شريحة ${slIdx + 1}</strong>
                     <div class="row">
-                      <input type="text" style="flex: 1;" value="${esc(mediaVal)}" oninput="stories[${sIdx}].slides[${slIdx}].media=this.value; activeStory=${sIdx}; activeSlide=${slIdx}; updatePreview();">
-                      <input type="file" accept="image/*,video/mp4,video/webm" style="width: auto; padding: 5px;" onchange="onSlideMediaPick(event, ${sIdx}, ${slIdx})">
+                      <button class="btn sec sm" type="button" onclick="activeStory=${sIdx}; activeSlide=${slIdx}; updatePreview();">معاينة</button>
+                      ${st.slides.length > 1 ? `<button class="btn danger sm" type="button" onclick="delSlide(${sIdx},${slIdx})">إزالة</button>` : ""}
                     </div>
                   </div>
-                  <div>
-                    <label>ربط بمنتج (اختياري)</label>
-                    <select onchange="stories[${sIdx}].slides[${slIdx}].productId=this.value; updatePreview();">
-                      ${prodOptions(sl.productId)}
-                    </select>
+                  <div class="grid-2">
+                    <div>
+                      <label>ربط بمنتج/منشور (يلتقط صورته تلقائياً)</label>
+                      <select onchange="onProductSelect(${sIdx}, ${slIdx}, this.value)">
+                        ${prodOptions(sl.productId)}
+                      </select>
+                    </div>
+                    <div>
+                      <label>أو ارفع صورة / فيديو من جهازك</label>
+                      <div class="row">
+                        <input type="text" style="flex: 1;" value="${esc(mediaVal)}" oninput="stories[${sIdx}].slides[${slIdx}]._autoFromProduct=false; stories[${sIdx}].slides[${slIdx}].media=this.value; activeStory=${sIdx}; activeSlide=${slIdx}; updatePreview();">
+                        <input type="file" accept="image/*,video/mp4,video/webm" style="width: auto; padding: 5px;" onchange="onSlideMediaPick(event, ${sIdx}, ${slIdx})">
+                      </div>
+                    </div>
+                  </div>
+                  <div style="margin-top: 8px;">
+                    <label>النص الظاهر على الشريحة</label>
+                    <textarea oninput="stories[${sIdx}].slides[${slIdx}].caption=this.value; activeStory=${sIdx}; activeSlide=${slIdx}; updatePreview();">${esc(sl.caption)}</textarea>
                   </div>
                 </div>
-                <div style="margin-top: 8px;">
-                  <label>النص الظاهر على الشريحة</label>
-                  <textarea oninput="stories[${sIdx}].slides[${slIdx}].caption=this.value; activeStory=${sIdx}; activeSlide=${slIdx}; updatePreview();">${esc(sl.caption)}</textarea>
-                </div>
-              </div>
-            `;
-          }).join("")}
-        </div>
-      `).join("");
+              `;
+            }).join("")}
+          </div>
+        `;
+      }).join("");
 
       updatePreview();
     }
@@ -413,10 +512,28 @@
 
     window.onSlideMediaPick = async (e, sIdx, slIdx) => {
       const f = e.target.files?.[0];
-      await handleFileUpload(f, (repoPath, dataUrl, isVideo) => {
-        stories[sIdx].slides[slIdx].media = repoPath;
-        stories[sIdx].slides[slIdx].type = isVideo ? "video" : "image";
-        stories[sIdx].slides[slIdx]._previewUrl = dataUrl;
+      await handleFileUpload(f, (repoPath, dataUrl, isVideo, posterInfo) => {
+        const sl = stories[sIdx].slides[slIdx];
+        sl._autoFromProduct = false;
+        sl.media = repoPath;
+        sl.type = isVideo ? "video" : "image";
+        sl._previewUrl = dataUrl;
+
+        if (isVideo && posterInfo) {
+          sl.poster = posterInfo.repoPath;
+          sl._previewPoster = posterInfo.dataUrl;
+        }
+
+        if (!stories[sIdx].cover || stories[sIdx].cover === "icon-512.png") {
+          if (!isVideo) {
+            stories[sIdx].cover = repoPath;
+            stories[sIdx]._previewCover = dataUrl;
+          } else if (posterInfo) {
+            stories[sIdx].cover = posterInfo.repoPath;
+            stories[sIdx]._previewCover = posterInfo.dataUrl;
+          }
+        }
+
         activeStory = sIdx;
         activeSlide = slIdx;
         render();
@@ -424,7 +541,7 @@
     };
 
     window.addSlide = (sIdx) => {
-      stories[sIdx].slides.push({ media: stories[sIdx].cover || "icon-512.png", caption: "", productId: "" });
+      stories[sIdx].slides.push({ media: "", caption: "", productId: "" });
       activeStory = sIdx;
       activeSlide = stories[sIdx].slides.length - 1;
       render();
@@ -444,21 +561,32 @@
     };
 
     function getCleanStoriesJson() {
-      return JSON.stringify(stories.map((st, idx) => ({
-        id: String(st.id || ("story-" + (idx + 1))).trim(),
-        title: String(st.title || "").trim(),
-        cover: String(st.cover || "icon-512.png").trim(),
-        slides: (st.slides || []).map(sl => {
-          const m = String(sl.media || sl.image || st.cover || "icon-512.png").trim();
-          const item = {
-            media: m,
-            caption: String(sl.caption || "").trim(),
-            productId: String(sl.productId || "").trim()
-          };
-          if (sl.type === "video" || /\.(mp4|webm|mov)$/i.test(m)) item.type = "video";
-          return item;
-        })
-      })), null, 2);
+      return JSON.stringify(stories.map((st, idx) => {
+        const autoCover = resolveStoryCover(st);
+        const cleanCover = (autoCover && !autoCover.startsWith("data:"))
+          ? autoCover
+          : (st.cover && !st.cover.startsWith("data:") ? st.cover : "icon-512.png");
+
+        return {
+          id: String(st.id || ("story-" + (idx + 1))).trim(),
+          title: String(st.title || "").trim(),
+          cover: String(cleanCover).trim(),
+          slides: (st.slides || []).map(sl => {
+            const prod = sl.productId ? getProductById(sl.productId) : null;
+            const m = String(sl.media || sl.image || (prod && prod.image) || cleanCover || "icon-512.png").trim();
+            const item = {
+              media: m,
+              caption: String(sl.caption || "").trim(),
+              productId: String(sl.productId || "").trim()
+            };
+            if (sl.poster && !String(sl.poster).startsWith("data:")) {
+              item.poster = String(sl.poster).trim();
+            }
+            if (sl.type === "video" || /\.(mp4|webm|mov)$/i.test(m)) item.type = "video";
+            return item;
+          })
+        };
+      }), null, 2);
     }
 
     function updatePreview() {
@@ -471,7 +599,8 @@
       document.getElementById("prevCaption").textContent = sl?.caption || "";
       document.getElementById("prevCta").style.display = sl?.productId ? "inline-block" : "none";
 
-      const src = sl?._previewUrl || sl?.media || sl?.image || st?._previewCover || st?.cover || "icon-512.png";
+      const prod = sl?.productId ? getProductById(sl.productId) : null;
+      const src = sl?._previewUrl || sl?.media || sl?.image || (prod && prod.image) || resolveStoryCover(st) || "icon-512.png";
       const isVid = Boolean(sl?._previewUrl && sl.type === "video") || /\.(mp4|webm|mov)(\?.*)?$/i.test(src);
 
       if (isVid) {
@@ -558,8 +687,8 @@
       stories.push({
         id: "story-" + Date.now(),
         title: "ستوري جديد",
-        cover: "icon-512.png",
-        slides: [{ media: "icon-512.png", caption: "", productId: "" }]
+        cover: "",
+        slides: [{ media: "", caption: "", productId: "" }]
       });
       activeStory = stories.length - 1;
       activeSlide = 0;
