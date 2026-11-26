@@ -113,8 +113,7 @@
     };
 
     const r = await fetch(`${api}?ref=${encodeURIComponent(c.branch || 'main')}`, { headers });
-    if (r.status === 404) return;
-    if (!r.ok) return;
+    if (r.status === 404 || !r.ok) return;
 
     const meta = await r.json();
     if (!meta?.sha) return;
@@ -128,6 +127,75 @@
         branch: c.branch || 'main'
       })
     });
+  }
+
+  function compressImageToBase64(file, maxDim = 1000, quality = 0.84) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('تعذر قراءة ملف الصورة'));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('الملف المختار ليس صورة صالحة'));
+        img.onload = () => {
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w >= h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+
+          const isPng = file.type === 'image/png';
+          const outMime = isPng ? 'image/png' : 'image/jpeg';
+          const ext = isPng ? 'png' : 'jpg';
+          const dataUrl = canvas.toDataURL(outMime, quality);
+          const base64 = dataUrl.split(',')[1] || '';
+          resolve({ base64, ext, previewUrl: dataUrl });
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function uploadImageToGitHub(file, folder = 'images') {
+    if (!cfg.owner || !cfg.repo || !cfg.token) {
+      throw new Error('يرجى تسجيل الدخول أولاً');
+    }
+    const { base64, ext } = await compressImageToBase64(file);
+    const fileName = `prod_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.${ext}`;
+    const filePath = `${folder}/${fileName}`;
+    const api = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${filePath}`;
+
+    const res = await fetch(api, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${cfg.token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/vnd.github+json'
+      },
+      body: JSON.stringify({
+        message: `Upload ${filePath}`,
+        content: base64,
+        branch: cfg.branch || 'main'
+      })
+    });
+
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(`فشل رفع الصورة (${res.status}): ${txt.slice(0, 120)}`);
+    }
+
+    return filePath;
   }
 
   async function ghGetStore(c) {
@@ -220,12 +288,20 @@
     const rows = (D.products || []).map((p, idx) => {
       const vCount = Array.isArray(p.variants) ? p.variants.length : 0;
       const vBadge = vCount > 0 ? ` · <strong>${vCount} أنواع</strong>` : '';
+      const thumbImg = p.image || (Array.isArray(p.variants) && p.variants.find(v => v.image)?.image) || '';
+      const thumbHtml = thumbImg
+        ? `<img src="${esc(thumbImg)}" alt="" style="width:46px;height:46px;object-fit:cover;border-radius:10px;border:1px solid #eee;flex-shrink:0">`
+        : `<div style="width:46px;height:46px;border-radius:10px;background:#fdf2f8;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🛍️</div>`;
+
       return `
       <div class="panel" style="margin-bottom:10px">
-        <div class="row" style="justify-content:space-between">
-          <div>
-            <strong>${esc(p.name || 'منتج بدون اسم')}</strong>
-            <div class="muted" style="font-size:13px">السعر: ${esc(p.price ?? 0)} ${esc(D.settings?.currency || '')} · المخزون: ${p.stock ?? 'غير محدد'}${vBadge}</div>
+        <div class="row" style="justify-content:space-between;gap:10px">
+          <div class="row" style="gap:10px;flex:1;min-width:0">
+            ${thumbHtml}
+            <div style="min-width:0">
+              <strong style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name || 'منتج بدون اسم')}</strong>
+              <div class="muted" style="font-size:13px">السعر: ${esc(p.price ?? 0)} ${esc(D.settings?.currency || '')} · المخزون: ${p.stock ?? 'غير محدد'}${vBadge}</div>
+            </div>
           </div>
           <div class="row">
             <button class="btn sec sm" data-edit-p="${idx}" type="button">تعديل</button>
@@ -296,7 +372,7 @@
 
     function renderVariantRowsHtml() {
       if (!p.variants.length) {
-        return `<div class="muted" style="font-size:13px;padding:8px 0">لا توجد أنواع مضافة لهذا المنتج حالياً. اضغط «+ إضافة نوع» لإضافة درجات أو أحجام أو نكهات.</div>`;
+        return `<div class="muted" style="font-size:13px;padding:8px 0">لا توجد أنواع مضافة لهذا المنتج حالياً. اضغط «+ إضافة نوع» لإضافة درجات أو أحجام.</div>`;
       }
       return p.variants.map((v, vIdx) => `
         <div class="panel" data-v-card="${vIdx}" style="margin-top:10px;padding:12px;background:#fdf8fb;border:1px solid #f5d0fe;border-radius:12px">
@@ -331,8 +407,16 @@
           </div>
 
           <div style="margin-top:8px">
-            <label style="font-size:12px">رابط أو مسار صورة النوع (اختياري)</label>
-            <input type="text" data-v-img="${vIdx}" value="${esc(v.image || '')}" placeholder="اتركه فارغاً لاستخدام صورة المنتج">
+            <label style="font-size:12px">صورة النوع (اختياري)</label>
+            <div class="row" style="gap:8px;align-items:center;margin-top:4px">
+              <input type="file" accept="image/*" data-v-file="${vIdx}" style="display:none">
+              <button class="btn sec sm" type="button" data-v-pick="${vIdx}">📁 رفع صورة</button>
+              <input type="text" data-v-img="${vIdx}" value="${esc(v.image || '')}" placeholder="images/... أو رابط صورة" style="flex:1;margin:0">
+            </div>
+            ${v.image ? `<div style="margin-top:6px;display:flex;align-items:center;gap:8px">
+              <img src="${esc(v.image)}" alt="" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;background:#fff">
+              <button class="btn sec sm" type="button" data-v-clear-img="${vIdx}">إزالة الصورة</button>
+            </div>` : ''}
           </div>
         </div>
       `).join('');
@@ -372,6 +456,27 @@
       });
     }
 
+    function updateMainImagePreview() {
+      const box = $('#epMainImgPreview');
+      const val = ($('#epImg')?.value || '').trim();
+      if (!box) return;
+      if (!val) {
+        box.innerHTML = '';
+        return;
+      }
+      box.innerHTML = `
+        <div style="margin-top:8px;display:flex;align-items:center;gap:10px">
+          <img src="${esc(val)}" alt="" style="width:68px;height:68px;object-fit:cover;border-radius:10px;border:1px solid #e5e7eb;background:#fff">
+          <button class="btn sec sm" type="button" id="epClearMainImg">إزالة الصورة</button>
+        </div>
+      `;
+      $('#epClearMainImg')?.addEventListener('click', () => {
+        if ($('#epImg')) $('#epImg').value = '';
+        p.image = '';
+        updateMainImagePreview();
+      });
+    }
+
     function bindVariantEvents() {
       $('#addVarBtn')?.addEventListener('click', () => {
         syncDraftFromDom();
@@ -395,6 +500,50 @@
           syncDraftFromDom();
           const vIdx = +btn.dataset.vDel;
           p.variants.splice(vIdx, 1);
+          refreshVariantsArea();
+        };
+      });
+
+      md.querySelectorAll('[data-v-pick]').forEach(btn => {
+        btn.onclick = () => {
+          const vIdx = +btn.dataset.vPick;
+          const fileInp = md.querySelector(`[data-v-file="${vIdx}"]`);
+          fileInp?.click();
+        };
+      });
+
+      md.querySelectorAll('[data-v-file]').forEach(inp => {
+        inp.onchange = async () => {
+          const file = inp.files?.[0];
+          if (!file) return;
+          const vIdx = +inp.dataset.vFile;
+          const pickBtn = md.querySelector(`[data-v-pick="${vIdx}"]`);
+          syncDraftFromDom();
+          if (pickBtn) {
+            pickBtn.disabled = true;
+            pickBtn.textContent = 'جاري الرفع...';
+          }
+          try {
+            const uploadedPath = await uploadImageToGitHub(file, 'images');
+            p.variants[vIdx].image = uploadedPath;
+            toast('تم رفع صورة النوع بنجاح');
+            refreshVariantsArea();
+          } catch (err) {
+            alert(err.message || 'فشل رفع الصورة');
+          } finally {
+            if (pickBtn) {
+              pickBtn.disabled = false;
+              pickBtn.textContent = '📁 رفع صورة';
+            }
+          }
+        };
+      });
+
+      md.querySelectorAll('[data-v-clear-img]').forEach(btn => {
+        btn.onclick = () => {
+          syncDraftFromDom();
+          const vIdx = +btn.dataset.vClearImg;
+          p.variants[vIdx].image = '';
           refreshVariantsArea();
         };
       });
@@ -422,7 +571,15 @@
         <input type="checkbox" id="epInStock" ${p.inStock !== false ? 'checked' : ''} style="width:auto">
         المنتج متوفر للبيع
       </label>
-      <label>رابط أو مسار الصورة الرئيسية</label><input type="text" id="epImg" value="${esc(p.image || '')}">
+
+      <label>صورة المنتج الرئيسية</label>
+      <div class="row" style="gap:8px;align-items:center;margin-top:4px">
+        <input type="file" id="epMainFile" accept="image/*" style="display:none">
+        <button class="btn sec sm" type="button" id="epPickMainImg">📁 رفع صورة من الجهاز</button>
+        <input type="text" id="epImg" value="${esc(p.image || '')}" placeholder="images/... أو رابط صورة" style="flex:1;margin:0">
+      </div>
+      <div id="epMainImgPreview"></div>
+
       <label>الوصف</label><textarea id="epDesc">${esc(p.description || '')}</textarea>
 
       <div style="margin-top:16px;padding-top:12px;border-top:1px solid #e5e7eb">
@@ -440,7 +597,34 @@
     `;
 
     ov.classList.add('show');
+    updateMainImagePreview();
     bindVariantEvents();
+
+    $('#epImg')?.addEventListener('input', updateMainImagePreview);
+    $('#epPickMainImg')?.addEventListener('click', () => $('#epMainFile')?.click());
+    $('#epMainFile')?.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const pickBtn = $('#epPickMainImg');
+      if (pickBtn) {
+        pickBtn.disabled = true;
+        pickBtn.textContent = 'جاري الرفع...';
+      }
+      try {
+        const uploadedPath = await uploadImageToGitHub(file, 'images');
+        if ($('#epImg')) $('#epImg').value = uploadedPath;
+        p.image = uploadedPath;
+        updateMainImagePreview();
+        toast('تم رفع صورة المنتج بنجاح');
+      } catch (err) {
+        alert(err.message || 'فشل رفع الصورة');
+      } finally {
+        if (pickBtn) {
+          pickBtn.disabled = false;
+          pickBtn.textContent = '📁 رفع صورة من الجهاز';
+        }
+      }
+    });
 
     $('#epCancel').onclick = () => ov.classList.remove('show');
     ov.onclick = e => { if (e.target === ov) ov.classList.remove('show'); };
