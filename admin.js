@@ -1,950 +1,148 @@
-const $ = s => document.querySelector(s);
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmt = n => Number(n || 0).toLocaleString('en-US');
-const enc = s => btoa(unescape(encodeURIComponent(s)));
-const dec = b => decodeURIComponent(escape(atob(b.replace(/\n/g, ''))));
-const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+/**
+ * يحوّل رابط صورة أو فيديو إلى مسار ملف داخل مستودع GitHub إذا كان تابعاً له.
+ * يعيد null إذا كان رابطاً خارجياً أو فارغاً.
+ */
+function extractRepoFilePath(url, owner, repo, branch = 'main') {
+  if (!url || typeof url !== 'string') return null;
+  const clean = url.trim().split('?')[0].split('#')[0];
+  if (!clean || clean.startsWith('data:') || clean.startsWith('blob:')) return null;
 
-const clampDisc = d => Math.max(0, Math.min(99, Number(d) || 0));
-const discPrice = (price, disc) => {
-  const base = Number(price) || 0;
-  const pct = clampDisc(disc);
-  return pct > 0 ? Math.round(base * (1 - pct / 100)) : base;
-};
-const parseStock = val => {
-  if (val === '' || val === null || val === undefined) return null;
-  const trimmed = String(val).trim();
-  if (trimmed === '') return null;
-  const n = Number(trimmed);
-  if (!Number.isFinite(n)) return null;
-  return Math.max(0, Math.floor(n));
-};
-
-let cfg = {};
-try { cfg = JSON.parse(localStorage.getItem('gh_cfg') || '{}'); } catch (e) {}
-let D = { settings: { name: 'المتجر', currency: '', whatsapp: '' }, categories: [], products: [] };
-let sha = null, dirty = false, tab = 'products', filterCat = 'all', filterStock = 'all';
-const previews = {};
-
-function toast(m) {
-  const t = $('#toast'); t.textContent = m; t.style.display = 'block';
-  clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', 4000);
-}
-function setDirty(v) { dirty = v; $('#savebar').style.display = v ? 'flex' : 'none'; }
-window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
-
-/* ---------- GitHub API ---------- */
-async function api(path, opts = {}) {
-  const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path}` +
-    (opts.method ? '' : `?ref=${encodeURIComponent(cfg.branch)}&t=${Date.now()}`);
-  const r = await fetch(url, {
-    ...opts,
-    headers: { Authorization: 'Bearer ' + cfg.token, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' }
-  });
-  if (!r.ok) {
-    const j = await r.json().catch(() => ({}));
-    const e = new Error(j.message || ('HTTP ' + r.status)); e.status = r.status; throw e;
+  // مسار نسبي مباشر مثل: uploads/story1.jpg أو images/p1.png
+  if (!/^https?:\/\//i.test(clean)) {
+    return clean.replace(/^\/+/, '');
   }
-  return r.json();
-}
 
-async function loadData() {
   try {
-    const f = await api('data/store.json');
-    sha = f.sha;
-    D = JSON.parse(dec(f.content));
-  } catch (e) {
-    if (e.status === 404) { sha = null; } else throw e;
-  }
-  D.settings = D.settings || {}; D.categories = D.categories || []; D.products = D.products || [];
-}
+    const u = new URL(clean);
+    const path = decodeURIComponent(u.pathname).replace(/^\/+/, '');
 
-function normalizeProductsStockBeforeSave() {
-  D.products = (D.products || []).map(prod => {
-    const vars = Array.isArray(prod.variants) ? prod.variants.map(vr => {
-      const vStock = parseStock(vr.stock);
-      return {
-        ...vr,
-        stock: vStock,
-        inStock: vStock !== null ? vStock > 0 : (vr.inStock !== false)
-      };
-    }) : [];
-
-    if (vars.length > 0) {
-      return {
-        ...prod,
-        price: 0,
-        variants: vars,
-        inStock: vars.some(vr => vr.stock !== null ? vr.stock > 0 : vr.inStock !== false)
-      };
+    // روابط raw.githubusercontent.com/<owner>/<repo>/<branch>/<filepath>
+    if (u.hostname === 'raw.githubusercontent.com') {
+      const prefix = `${owner}/${repo}/${branch}/`;
+      if (path.startsWith(prefix)) return path.slice(prefix.length);
+      const altPrefix = `${owner}/${repo}/`;
+      if (path.startsWith(altPrefix)) {
+        const parts = path.slice(altPrefix.length).split('/');
+        parts.shift(); // إزالة اسم الفرع
+        return parts.join('/');
+      }
     }
 
-    const pStock = parseStock(prod.stock);
-    return {
-      ...prod,
-      stock: pStock,
-      variants: [],
-      inStock: pStock !== null ? pStock > 0 : (prod.inStock !== false)
-    };
-  });
+    // روابط GitHub Pages مثل: https://<owner>.github.io/<repo>/<filepath>
+    if (u.hostname.endsWith('.github.io')) {
+      const repoPrefix = `${repo}/`;
+      if (path.startsWith(repoPrefix)) return path.slice(repoPrefix.length);
+      if (u.hostname === `${owner.toLowerCase()}.github.io`) return path;
+    }
+
+    // روابط github.com/<owner>/<repo>/blob/<branch>/<filepath>
+    if (u.hostname === 'github.com') {
+      const blobPrefix = `${owner}/${repo}/blob/${branch}/`;
+      if (path.startsWith(blobPrefix)) return path.slice(blobPrefix.length);
+    }
+  } catch (_) {}
+
+  return null;
 }
 
-async function saveData() {
-  const btn = $('#save'); btn.disabled = true; btn.textContent = 'جاري الحفظ...';
-  try {
-    normalizeProductsStockBeforeSave();
-    const body = { message: 'تحديث المتجر من لوحة الإدارة', content: enc(JSON.stringify(D, null, 2)), branch: cfg.branch };
-    if (sha) body.sha = sha;
-    const res = await api('data/store.json', { method: 'PUT', body: JSON.stringify(body) });
-    sha = res.content.sha;
-    setDirty(false);
-    toast('تم الحفظ ✓ — تظهر التغييرات في المتجر خلال دقيقة تقريباً');
-  } catch (e) {
-    if (e.status === 409 || e.status === 422) toast('تعارض: تم تعديل الملف من مكان آخر. أعيدي تحميل الصفحة ثم كرري التعديل.');
-    else toast('فشل الحفظ: ' + e.message);
-  } finally { btn.disabled = false; btn.textContent = 'حفظ ونشر'; }
-}
-$('#save').onclick = saveData;
+/**
+ * يجمع كل مسارات الصور/الوسائط المستخدمة حالياً في المنتجات والستوريات
+ */
+function collectAllUsedMediaPaths(data = {}, stories = [], cfg = {}) {
+  const used = new Set();
+  const { owner, repo, branch = 'main' } = cfg;
 
-function exportBackup() {
-  try {
-    const blob = new Blob([JSON.stringify(D, null, 2)], { type: 'application/json;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `store-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-    toast('تم تحميل النسخة الاحتياطية ✓');
-  } catch (e) {
-    toast('تعذر إنشاء النسخة الاحتياطية');
-  }
-}
-
-async function uploadImage(file) {
-  const img = await createImageBitmap(file);
-  const s = Math.min(1, 900 / Math.max(img.width, img.height));
-  const c = document.createElement('canvas');
-  c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
-  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-  const url = c.toDataURL('image/jpeg', 0.82);
-  const path = 'images/' + Date.now() + '.jpg';
-  await api(path, { method: 'PUT', body: JSON.stringify({ message: 'رفع صورة منتج', content: url.split(',')[1], branch: cfg.branch }) });
-  previews[path] = url;
-  return path;
-}
-
-/* ---------- login ---------- */
-function guess() {
-  let saved = {};
-  try {
-    saved = {
-      ...JSON.parse(localStorage.getItem('last_gh_cfg') || '{}'),
-      ...JSON.parse(localStorage.getItem('gh_cfg') || '{}')
-    };
-  } catch (e) {}
-
-  const h = location.hostname;
-  if (h.endsWith('.github.io')) {
-    cfg.owner = cfg.owner || h.split('.')[0];
-    const seg = location.pathname.split('/').filter(Boolean)[0];
-    cfg.repo = cfg.repo || (seg && !seg.includes('.') ? seg : h);
-  }
-
-  cfg.owner = cfg.owner || saved.owner || '';
-  cfg.repo = cfg.repo || saved.repo || '';
-  cfg.branch = cfg.branch || saved.branch || 'main';
-  cfg.token = cfg.token || saved.token || '';
-}
-
-function fillLogin() {
-  $('#lo').value = cfg.owner || '';
-  $('#lr').value = cfg.repo || '';
-  $('#lb').value = cfg.branch || 'main';
-  $('#lt').value = cfg.token || '';
-}
-
-async function connect() {
-  cfg = {
-    owner: $('#lo').value.trim(),
-    repo: $('#lr').value.trim(),
-    branch: $('#lb').value.trim() || 'main',
-    token: $('#lt').value.trim()
+  const addUrl = (val) => {
+    const p = extractRepoFilePath(val, owner, repo, branch);
+    if (p) used.add(p);
   };
-  if (!cfg.owner || !cfg.repo || !cfg.token) { toast('أكملي كل الحقول'); return; }
-  const b = $('#connect'); b.disabled = true; b.textContent = 'جاري الاتصال...';
-  try {
-    await loadData();
+
+  // منتجات المتجر وأنواعها
+  (data.products || []).forEach(prod => {
+    addUrl(prod?.image);
+    if (Array.isArray(prod?.images)) prod.images.forEach(addUrl);
+    (prod?.variants || []).forEach(v => {
+      addUrl(v?.image);
+    });
+  });
+
+  // الستوريات وشرائحها
+  (stories || []).forEach(st => {
+    addUrl(st?.cover);
+    addUrl(st?.image);
+    (st?.slides || []).forEach(sl => {
+      addUrl(sl?.media);
+      addUrl(sl?.image);
+      addUrl(sl?.poster);
+    });
+  });
+
+  return used;
+}
+
+/**
+ * يحذف ملفاً واحداً من مستودع GitHub بعد جلب sha الخاص به
+ */
+async function deleteFileFromGitHub(filePath, cfg, commitMessage = 'Delete unused media') {
+  const { owner, repo, branch = 'main', token } = cfg;
+  if (!filePath || !owner || !repo || !token) return false;
+
+  const encodedPath = filePath.split('/').map(encodeURIComponent).join('/');
+  const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}?ref=${encodeURIComponent(branch)}`;
+
+  const headers = {
+    'Authorization': `Bearer ${token}`,
+    'Accept': 'application/vnd.github+json'
+  };
+
+  const getRes = await fetch(apiUrl, { headers });
+  if (getRes.status === 404) return true; // الملف غير موجود أصلاً
+  if (!getRes.ok) {
+    throw new Error(`تعذر قراءة بيانات الملف (${filePath}): ${getRes.status}`);
+  }
+
+  const fileMeta = await getRes.json();
+  if (!fileMeta?.sha) return false;
+
+  const delUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}`;
+  const delRes = await fetch(delUrl, {
+    method: 'DELETE',
+    headers: {
+      ...headers,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      message: commitMessage,
+      sha: fileMeta.sha,
+      branch
+    })
+  });
+
+  if (!delRes.ok && delRes.status !== 404) {
+    throw new Error(`فشل حذف الملف (${filePath}): ${delRes.status}`);
+  }
+  return true;
+}
+
+/**
+ * يحذف الملفات التي كانت مستخدمة سابقاً وأصبحت غير مستخدمة الآن
+ */
+async function deleteUnusedMediaFiles(previousUsedPaths, currentData, currentStories, cfg) {
+  const stillUsed = collectAllUsedMediaPaths(currentData, currentStories, cfg);
+  const toDelete = [...previousUsedPaths].filter(p => !stillUsed.has(p));
+
+  const deleted = [];
+  const failed = [];
+
+  for (const filePath of toDelete) {
     try {
-      localStorage.setItem('gh_cfg', JSON.stringify(cfg));
-      localStorage.setItem('last_gh_cfg', JSON.stringify({ owner: cfg.owner, repo: cfg.repo, branch: cfg.branch }));
-    } catch (e) {}
-    $('#login').style.display = 'none'; $('#app').style.display = 'block'; $('#logout').style.display = '';
-    render();
-  } catch (e) {
-    toast(e.status === 401 ? 'المفتاح غير صحيح أو منتهي' : e.status === 404 ? 'المستودع أو الفرع غير موجود، أو المفتاح لا يملك صلاحية عليه' : 'خطأ: ' + e.message);
-  } finally { b.disabled = false; b.textContent = 'دخول'; }
-}
-$('#connect').onclick = connect;
-$('#logout').onclick = () => {
-  if (dirty && !confirm('توجد تغييرات غير محفوظة. تسجيل الخروج؟')) return;
-  try {
-    localStorage.setItem('last_gh_cfg', JSON.stringify({ owner: cfg.owner, repo: cfg.repo, branch: cfg.branch }));
-    localStorage.removeItem('gh_cfg');
-  } catch (e) {}
-  location.reload();
-};
-
-/* ---------- views ---------- */
-$('#tabs').querySelectorAll('button').forEach(b => b.onclick = () => { tab = b.dataset.t; render(); });
-
-function render() {
-  $('#tabs').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.t === tab));
-  ({ products: viewProducts, categories: viewCategories, settings: viewSettings })[tab]();
-}
-
-const hasVar = p => Array.isArray(p.variants) && p.variants.length > 0;
-const effectiveVarDisc = (p, v) => clampDisc(v.discount || p.discount || 0);
-const isVarAvail = v => {
-  const st = parseStock(v.stock);
-  if (st !== null) return st > 0;
-  return v.inStock !== false;
-};
-const isProdAvail = p => {
-  if (hasVar(p)) return p.variants.some(isVarAvail);
-  const st = parseStock(p.stock);
-  if (st !== null) return st > 0;
-  return p.inStock !== false;
-};
-
-const isProdLowStock = p => {
-  if (!isProdAvail(p)) return false;
-  if (hasVar(p)) {
-    return p.variants.some(v => {
-      const st = parseStock(v.stock);
-      return isVarAvail(v) && st !== null && st > 0 && st <= 3;
-    });
-  }
-  const st = parseStock(p.stock);
-  return st !== null && st > 0 && st <= 3;
-};
-
-const stockBadge = p => {
-  if (!isProdAvail(p)) return ' · <span style="color:#c92a2a;font-weight:700">غير متوفر</span>';
-  if (hasVar(p)) {
-    const tracked = p.variants.filter(v => parseStock(v.stock) !== null);
-    if (tracked.length) {
-      const sum = tracked.reduce((a, v) => a + (parseStock(v.stock) || 0), 0);
-      const lowNote = isProdLowStock(p) ? ' <span style="color:#b45309;font-weight:700">(منخفض)</span>' : '';
-      return ` · المتبقي: ${sum}${lowNote}`;
+      await deleteFileFromGitHub(filePath, cfg, `Remove unused media: ${filePath}`);
+      deleted.push(filePath);
+    } catch (err) {
+      console.error(err);
+      failed.push(filePath);
     }
-    return '';
   }
-  const st = parseStock(p.stock);
-  if (st !== null) {
-    const lowNote = isProdLowStock(p) ? ' <span style="color:#b45309;font-weight:700">(منخفض)</span>' : '';
-    return ` · الكمية: ${st}${lowNote}`;
-  }
-  return '';
-};
 
-const priceText = p => {
-  const cur = D.settings.currency || '';
-  if (hasVar(p)) {
-    const finals = p.variants.map(v => discPrice(v.price, effectiveVarDisc(p, v)));
-    const anyDisc = p.variants.some(v => effectiveVarDisc(p, v) > 0);
-    return `${p.variants.length} أنواع · من ${fmt(Math.min(...finals))} ${cur}${anyDisc ? ' (خصم)' : ''}${stockBadge(p)}`;
-  }
-  const d = clampDisc(p.discount || 0);
-  if (d > 0) {
-    return `${fmt(discPrice(p.price, d))} ${cur} (خصم ${d}%)${stockBadge(p)}`;
-  }
-  return `${fmt(p.price)} ${cur}${stockBadge(p)}`;
-};
-
-function viewProducts() {
-  const list = D.products.filter(p => {
-    const catOk = filterCat === 'all' || p.category === filterCat;
-    if (!catOk) return false;
-    if (filterStock === 'out') return !isProdAvail(p);
-    if (filterStock === 'low') return isProdLowStock(p);
-    return true;
-  });
-
-  $('#view').innerHTML = `<div class="panel">
-    <div class="row" style="justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
-      <h2 style="margin:0">المنتجات (${list.length})</h2>
-      <div class="row" style="gap:8px;flex-wrap:wrap">
-        <button type="button" class="btn sec sm" id="mergeBtn" style="background:#eef6ff;color:#1d4ed8;border:1px solid #bfdbfe">⇄ دمج منتجات</button>
-        <button type="button" class="btn sec sm" id="backupBtn">نسخة احتياطية JSON</button>
-        <button class="btn" id="addP">+ منتج جديد</button>
-      </div>
-    </div>
-    <div class="row" style="gap:8px;flex-wrap:wrap">
-      <select id="fcat" style="flex:1;min-width:150px"><option value="all">كل الأقسام</option>${D.categories.map(c =>
-        `<option value="${esc(c.id)}" ${c.id === filterCat ? 'selected' : ''}>${esc(c.icon || '')} ${esc(c.name)}</option>`).join('')}</select>
-      <select id="fstock" style="flex:1;min-width:150px">
-        <option value="all" ${filterStock === 'all' ? 'selected' : ''}>كل حالات المخزون</option>
-        <option value="low" ${filterStock === 'low' ? 'selected' : ''}>منخفضة الكمية (3 أو أقل)</option>
-        <option value="out" ${filterStock === 'out' ? 'selected' : ''}>غير متوفرة</option>
-      </select>
-    </div>
-    <div class="list" style="margin-top:8px">${list.length ? list.map(p => {
-      const c = D.categories.find(x => x.id === p.category);
-      const varImg = hasVar(p) ? p.variants.find(v => v.image)?.image : '';
-      const imgSrc = p.image || varImg || '';
-      const th = imgSrc ? `<img src="${esc(previews[imgSrc] || imgSrc)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">` : (c?.icon || '🛍️');
-      return `<div class="it"><div class="th" style="overflow:hidden">${th}</div>
-        <div class="n">${esc(p.name)}<small>${esc(c?.name || 'بدون قسم')} · ${priceText(p)}</small></div>
-        <button class="btn sec sm" data-e="${esc(p.id)}">تعديل</button>
-        <button class="btn danger sm" data-d="${esc(p.id)}">حذف</button></div>`;
-    }).join('') : '<div class="empty">لا توجد منتجات</div>'}</div></div>`;
-  $('#fcat').onchange = e => { filterCat = e.target.value; viewProducts(); };
-  $('#fstock').onchange = e => { filterStock = e.target.value; viewProducts(); };
-  $('#mergeBtn').onclick = openMergeProductsModal;
-  $('#backupBtn').onclick = exportBackup;
-  $('#addP').onclick = () => editProduct(null);
-  $('#view').querySelectorAll('[data-e]').forEach(b => b.onclick = () => editProduct(b.dataset.e));
-  $('#view').querySelectorAll('[data-d]').forEach(b => b.onclick = () => {
-    const p = D.products.find(x => x.id === b.dataset.d);
-    if (!confirm(`حذف "${p.name}"؟`)) return;
-    D.products = D.products.filter(x => x.id !== p.id); setDirty(true); viewProducts();
-  });
+  return { deleted, failed };
 }
-
-/* ---------- merge products into one with variants ---------- */
-function openMergeProductsModal() {
-  if (D.products.length < 2) {
-    toast('تحتاجين لمنتجين على الأقل للدمج');
-    return;
-  }
-  const md = $('#md');
-  md.style.maxWidth = '720px';
-  md.style.width = '95vw';
-  md.style.maxHeight = '90vh';
-  md.style.padding = '22px';
-  md.style.overflowY = 'auto';
-
-  let mCat = filterCat !== 'all' ? filterCat : 'all';
-  const selectedIds = new Set();
-
-  const drawMerge = () => {
-    const visibleProds = D.products.filter(p => mCat === 'all' || p.category === mCat);
-    const firstSel = D.products.find(p => selectedIds.has(p.id));
-    const defaultCat = firstSel ? firstSel.category : (D.categories[0]?.id || '');
-
-    md.innerHTML = `<button class="x" id="mmx">×</button>
-      <h2 style="margin-top:0;color:var(--pink);font-size:1.35rem">دمج منتجات في منتج واحد (بأنواع)</h2>
-      <p style="margin:0 0 12px;font-size:13.5px;color:#555;line-height:1.6">
-        حددي المنتجات التي تريدين جمعها كأنواع تحت منتج واحد (مثلاً: درجات حمرة أو أحجام عطر مختلفة). سيتم نقل أسعارها وكمياتها وصورها ومواصفاتها تلقائياً.
-      </p>
-
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:12px">
-        <div>
-          <label for="mName" style="font-size:13.5px">اسم المنتج المجمّع الجديد</label>
-          <input type="text" id="mName" placeholder="مثال: أحمر شفاه ليدورا" style="width:100%;box-sizing:border-box;padding:10px;font-size:14.5px">
-        </div>
-        <div>
-          <label for="mTargetCat" style="font-size:13.5px">قسم المنتج المجمّع</label>
-          <select id="mTargetCat" style="width:100%;box-sizing:border-box;padding:10px;font-size:14.5px">${D.categories.map(c =>
-            `<option value="${esc(c.id)}" ${c.id === defaultCat ? 'selected' : ''}>${esc(c.icon || '')} ${esc(c.name)}</option>`).join('')}</select>
-        </div>
-      </div>
-
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-        <span style="font-size:13.5px;font-weight:700">اختاري المنتجات (${selectedIds.size} محدد):</span>
-        <select id="mFilterCat" style="padding:6px 10px;font-size:13px">
-          <option value="all">تصفية: كل الأقسام</option>
-          ${D.categories.map(c => `<option value="${esc(c.id)}" ${c.id === mCat ? 'selected' : ''}>${esc(c.icon || '')} ${esc(c.name)}</option>`).join('')}
-        </select>
-      </div>
-
-      <div style="border:1px solid rgba(0,0,0,.12);border-radius:12px;max-height:320px;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;background:#fafafa">
-        ${visibleProds.map(p => {
-          const checked = selectedIds.has(p.id);
-          const c = D.categories.find(x => x.id === p.category);
-          const imgSrc = p.image || (hasVar(p) ? p.variants.find(v => v.image)?.image : '') || '';
-          return `<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:${checked ? '#fff0f5' : '#fff'};border:1px solid ${checked ? 'var(--pink)' : 'rgba(0,0,0,.08)'};cursor:pointer;margin:0">
-            <input type="checkbox" data-mpid="${esc(p.id)}" ${checked ? 'checked' : ''}>
-            ${imgSrc
-              ? `<img src="${esc(previews[imgSrc] || imgSrc)}" alt="" style="width:36px;height:36px;border-radius:8px;object-fit:cover;flex-shrink:0">`
-              : `<span style="width:36px;height:36px;border-radius:8px;background:#f3e8ee;display:flex;align-items:center;justify-content:center;flex-shrink:0">${esc(c?.icon || '🛍️')}</span>`}
-            <div style="flex:1;min-width:0">
-              <div style="font-weight:700;font-size:14px">${esc(p.name)}</div>
-              <div style="font-size:12px;color:#666">${esc(c?.name || '')} · ${priceText(p)}</div>
-            </div>
-          </label>`;
-        }).join('')}
-      </div>
-
-      <div class="row" style="margin-top:16px">
-        <button type="button" class="btn" id="mDoMerge" style="padding:10px 22px;font-size:14.5px">دمج المحدد (${selectedIds.size})</button>
-        <button type="button" class="btn sec" id="mCancel" style="padding:10px 18px;font-size:14.5px">إلغاء</button>
-      </div>`;
-
-    md.querySelector('#mmx').onclick = md.querySelector('#mCancel').onclick = closeModal;
-    md.querySelector('#mFilterCat').onchange = e => {
-      const keepName = md.querySelector('#mName').value;
-      mCat = e.target.value;
-      drawMerge();
-      md.querySelector('#mName').value = keepName;
-    };
-    md.querySelectorAll('[data-mpid]').forEach(chk => {
-      chk.onchange = () => {
-        const keepName = md.querySelector('#mName').value;
-        const keepTargetCat = md.querySelector('#mTargetCat').value;
-        if (chk.checked) selectedIds.add(chk.dataset.mpid);
-        else selectedIds.delete(chk.dataset.mpid);
-        drawMerge();
-        md.querySelector('#mName').value = keepName;
-        md.querySelector('#mTargetCat').value = keepTargetCat;
-      };
-    });
-
-    md.querySelector('#mDoMerge').onclick = () => {
-      if (selectedIds.size < 2) {
-        toast('اختاري منتجين على الأقل للدمج');
-        return;
-      }
-      const chosen = D.products.filter(p => selectedIds.has(p.id));
-      const baseName = (md.querySelector('#mName').value || '').trim() || chosen[0].name;
-      const targetCat = md.querySelector('#mTargetCat').value || chosen[0].category;
-
-      const mergedVariants = [];
-      const usedNames = new Set();
-      const pushUniqueVariant = vObj => {
-        let vName = (vObj.name || 'نوع').trim();
-        let counter = 2;
-        while (usedNames.has(vName)) {
-          vName = `${vObj.name.trim()} (${counter++})`;
-        }
-        usedNames.add(vName);
-        mergedVariants.push({ ...vObj, name: vName });
-      };
-
-      chosen.forEach(item => {
-        if (hasVar(item)) {
-          item.variants.forEach(v => {
-            const st = parseStock(v.stock);
-            pushUniqueVariant({
-              name: v.name || item.name,
-              price: +v.price || 0,
-              discount: clampDisc(v.discount || item.discount || 0),
-              stock: st,
-              description: (v.description || '').trim() || (item.description || '').trim(),
-              specs: (v.specs || '').trim() || (item.specs || '').trim(),
-              usage: (v.usage || '').trim() || (item.usage || '').trim(),
-              inStock: st !== null ? st > 0 : (v.inStock !== false),
-              image: v.image || item.image || ''
-            });
-          });
-        } else {
-          const st = parseStock(item.stock);
-          let cleanVarName = item.name.trim();
-          if (cleanVarName.startsWith(baseName + ' - ')) {
-            cleanVarName = cleanVarName.slice((baseName + ' - ').length).trim() || cleanVarName;
-          }
-          pushUniqueVariant({
-            name: cleanVarName,
-            price: +item.price || 0,
-            discount: clampDisc(item.discount || 0),
-            stock: st,
-            description: (item.description || '').trim(),
-            specs: (item.specs || '').trim(),
-            usage: (item.usage || '').trim(),
-            inStock: st !== null ? st > 0 : (item.inStock !== false),
-            image: item.image || ''
-          });
-        }
-      });
-
-      const firstImg = chosen.find(x => x.image)?.image || mergedVariants.find(v => v.image)?.image || '';
-      const mergedProduct = {
-        id: uid('p'),
-        name: baseName,
-        category: targetCat,
-        description: chosen[0].description || '',
-        specs: chosen[0].specs || '',
-        usage: chosen[0].usage || '',
-        image: firstImg,
-        price: 0,
-        discount: 0,
-        stock: null,
-        inStock: mergedVariants.some(v => isVarAvail(v)),
-        variants: mergedVariants
-      };
-
-      const firstIdx = D.products.findIndex(p => selectedIds.has(p.id));
-      D.products = D.products.filter(p => !selectedIds.has(p.id));
-      D.products.splice(Math.max(0, firstIdx), 0, mergedProduct);
-
-      setDirty(true);
-      closeModal();
-      render();
-      toast(`تم دمج ${chosen.length} منتجات في "${baseName}" ✓ — اضغطي "حفظ ونشر"`);
-    };
-  };
-
-  drawMerge();
-  $('#ov').classList.add('show');
-}
-
-function viewCategories() {
-  $('#view').innerHTML = `<div class="panel"><h2>الأقسام (قائمة المتجر)</h2>
-    <div class="list">${D.categories.length ? D.categories.map((c, i) => {
-      const n = D.products.filter(p => p.category === c.id).length;
-      return `<div class="it"><div class="th">${esc(c.icon || '📁')}</div>
-        <div class="n">${esc(c.name)}<small>${n} منتج</small></div>
-        <button class="btn sec sm" data-u="${i}" ${i === 0 ? 'disabled' : ''}>↑</button>
-        <button class="btn sec sm" data-w="${i}" ${i === D.categories.length - 1 ? 'disabled' : ''}>↓</button>
-        <button class="btn sec sm" data-r="${i}">تعديل</button>
-        <button class="btn danger sm" data-x="${i}">حذف</button></div>`;
-    }).join('') : '<div class="empty">لا توجد أقسام</div>'}</div>
-    <div class="row" style="margin-top:14px">
-      <input type="text" id="cn" placeholder="اسم القسم الجديد" style="flex:2;min-width:140px">
-      <input type="text" id="ci" placeholder="أيقونة 🧴" style="flex:1;min-width:70px" maxlength="4">
-      <button class="btn" id="addC">إضافة</button>
-    </div></div>`;
-  $('#addC').onclick = () => {
-    const name = $('#cn').value.trim(); if (!name) { toast('اكتبي اسم القسم'); return; }
-    D.categories.push({ id: uid('c'), name, icon: $('#ci').value.trim() });
-    setDirty(true); viewCategories();
-  };
-  const v = $('#view');
-  v.querySelectorAll('[data-u]').forEach(b => b.onclick = () => { const i = +b.dataset.u; [D.categories[i - 1], D.categories[i]] = [D.categories[i], D.categories[i - 1]]; setDirty(true); viewCategories(); });
-  v.querySelectorAll('[data-w]').forEach(b => b.onclick = () => { const i = +b.dataset.w; [D.categories[i + 1], D.categories[i]] = [D.categories[i], D.categories[i + 1]]; setDirty(true); viewCategories(); });
-  v.querySelectorAll('[data-r]').forEach(b => b.onclick = () => {
-    const c = D.categories[+b.dataset.r];
-    const name = prompt('اسم القسم:', c.name); if (name === null) return;
-    const icon = prompt('الأيقونة (إيموجي):', c.icon || ''); if (icon === null) return;
-    if (name.trim()) c.name = name.trim(); c.icon = icon.trim(); setDirty(true); viewCategories();
-  });
-  v.querySelectorAll('[data-x]').forEach(b => b.onclick = () => {
-    const c = D.categories[+b.dataset.x];
-    if (D.products.some(p => p.category === c.id)) { toast('انقلي منتجات هذا القسم أو احذفيها أولاً'); return; }
-    if (!confirm(`حذف قسم "${c.name}"؟`)) return;
-    D.categories.splice(+b.dataset.x, 1); setDirty(true); viewCategories();
-  });
-}
-
-function viewSettings() {
-  const s = D.settings;
-  $('#view').innerHTML = `<div class="panel"><h2>إعدادات المتجر</h2>
-    <label>اسم المتجر</label><input type="text" id="sn" value="${esc(s.name)}">
-    <label>العملة (تظهر بجانب السعر)</label><input type="text" id="sc" value="${esc(s.currency)}">
-    <label>رقم واتساب لاستقبال الطلبات (بصيغة دولية بدون +، مثال: 9647701234567)</label><input type="text" id="sw" value="${esc(s.whatsapp)}">
-    <div class="row" style="margin-top:14px"><button class="btn" id="ss">تطبيق</button></div></div>`;
-  $('#ss').onclick = () => {
-    D.settings = { name: $('#sn').value.trim() || 'المتجر', currency: $('#sc').value.trim(), whatsapp: $('#sw').value.trim() };
-    setDirty(true); toast('تم التطبيق — اضغطي "حفظ ونشر" لنشره');
-  };
-}
-
-/* ---------- product editor ---------- */
-function closeModal() { $('#ov').classList.remove('show'); }
-$('#ov').onclick = e => { if (e.target.id === 'ov') closeModal(); };
-
-function editProduct(id) {
-  if (!D.categories.length) { toast('أضيفي قسماً أولاً من تبويب الأقسام'); return; }
-  const isNew = !id;
-  const p = isNew
-    ? { id: uid('p'), name: '', category: D.categories[0].id, description: '', specs: '', usage: '', image: '', price: 0, discount: 0, stock: null, inStock: true, variants: [] }
-    : JSON.parse(JSON.stringify(D.products.find(x => x.id === id)));
-  p.specs = p.specs || '';
-  p.usage = p.usage || '';
-  p.discount = clampDisc(p.discount || 0);
-  p.stock = parseStock(p.stock);
-  p.inStock = p.stock !== null ? p.stock > 0 : (p.inStock !== false);
-  p.variants = (p.variants || []).map(v => {
-    const st = parseStock(v.stock);
-    return {
-      ...v,
-      image: v.image || '',
-      description: v.description || '',
-      specs: v.specs || '',
-      usage: v.usage || '',
-      discount: clampDisc(v.discount || 0),
-      stock: st,
-      inStock: st !== null ? st > 0 : (v.inStock !== false)
-    };
-  });
-
-  const md = $('#md');
-  md.style.maxWidth = '960px';
-  md.style.width = '96vw';
-  md.style.maxHeight = '92vh';
-  md.style.padding = '22px';
-  md.style.overflowY = 'auto';
-
-  const getMainStockEl = () => md.querySelector('#fstock');
-  const getMainInStockEl = () => md.querySelector('#finstock');
-
-  const sync = () => {
-    const nameEl = md.querySelector('#fn');
-    if (!nameEl) return;
-    p.name = nameEl.value;
-    p.category = md.querySelector('#fc').value;
-    p.description = md.querySelector('#fd').value;
-    p.specs = md.querySelector('#fsp').value;
-    p.usage = md.querySelector('#fus').value;
-    p.price = +md.querySelector('#fp').value || 0;
-    p.discount = clampDisc(md.querySelector('#fdisc').value || 0);
-
-    const stEl = getMainStockEl();
-    const inEl = getMainInStockEl();
-    if (stEl) {
-      p.stock = parseStock(stEl.value);
-      if (p.stock !== null) {
-        p.inStock = p.stock > 0;
-      } else if (inEl) {
-        p.inStock = inEl.checked;
-      }
-    }
-
-    md.querySelectorAll('[data-vn]').forEach(i => { if (p.variants[+i.dataset.vn]) p.variants[+i.dataset.vn].name = i.value; });
-    md.querySelectorAll('[data-vp]').forEach(i => { if (p.variants[+i.dataset.vp]) p.variants[+i.dataset.vp].price = +i.value || 0; });
-    md.querySelectorAll('[data-vd]').forEach(i => { if (p.variants[+i.dataset.vd]) p.variants[+i.dataset.vd].discount = clampDisc(i.value || 0); });
-    md.querySelectorAll('[data-vst]').forEach(i => {
-      const v = p.variants[+i.dataset.vst];
-      if (v) {
-        const st = parseStock(i.value);
-        v.stock = st;
-        v.inStock = st !== null ? st > 0 : true;
-      }
-    });
-    md.querySelectorAll('[data-vdsc]').forEach(i => { if (p.variants[+i.dataset.vdsc]) p.variants[+i.dataset.vdsc].description = i.value; });
-    md.querySelectorAll('[data-vsp]').forEach(i => { if (p.variants[+i.dataset.vsp]) p.variants[+i.dataset.vsp].specs = i.value; });
-    md.querySelectorAll('[data-vus]').forEach(i => { if (p.variants[+i.dataset.vus]) p.variants[+i.dataset.vus].usage = i.value; });
-    md.querySelectorAll('[data-vs]').forEach(i => {
-      const v = p.variants[+i.dataset.vs];
-      if (v && v.stock === null) {
-        v.inStock = i.checked;
-      }
-    });
-  };
-
-  const buildStandaloneFromVariant = (v, idx = 0, includeBaseName = false) => {
-    const st = parseStock(v.stock);
-    const baseTitle = (p.name || '').trim();
-    const varTitle = (v.name || '').trim() || `منتج ${idx + 1}`;
-    const finalName = (includeBaseName && baseTitle && !varTitle.includes(baseTitle))
-      ? `${baseTitle} - ${varTitle}`
-      : varTitle;
-    return {
-      id: uid('p' + idx),
-      name: finalName,
-      category: p.category,
-      description: (v.description || '').trim() || (p.description || '').trim(),
-      specs: (v.specs || '').trim() || (p.specs || '').trim(),
-      usage: (v.usage || '').trim() || (p.usage || '').trim(),
-      image: v.image || p.image || '',
-      price: +v.price || 0,
-      discount: clampDisc(v.discount || p.discount || 0),
-      stock: st,
-      inStock: st !== null ? st > 0 : (v.inStock !== false),
-      variants: []
-    };
-  };
-
-  const splitSingleVariant = idx => {
-    sync();
-    const v = p.variants[idx];
-    if (!v) return;
-    const varTitle = (v.name || '').trim();
-    if (!varTitle) { toast('اكتبي اسم النوع أولاً قبل فصله'); return; }
-    const includeBase = confirm(
-      `فصل النوع "${varTitle}" إلى منتج مستقل؟\n\n` +
-      `• موافق = يصبح اسمه: "${(p.name || '').trim()} - ${varTitle}"\n` +
-      `• إلغاء = يصبح اسمه: "${varTitle}" فقط`
-    );
-    const standalone = buildStandaloneFromVariant(v, idx, includeBase);
-    p.variants.splice(idx, 1);
-
-    if (p.variants.length > 0) {
-      p.price = 0;
-      p.inStock = p.variants.some(item => isVarAvail(item));
-    }
-
-    const savedParent = JSON.parse(JSON.stringify(p));
-    const parentIdx = D.products.findIndex(x => x.id === savedParent.id);
-    if (parentIdx >= 0) {
-      D.products[parentIdx] = savedParent;
-      D.products.splice(parentIdx + 1, 0, standalone);
-    } else {
-      D.products.push(savedParent, standalone);
-    }
-
-    setDirty(true);
-    draw();
-    toast(`تم فصل "${standalone.name}" كمنتج مستقل ✓`);
-  };
-
-  const splitVariantsToProducts = () => {
-    sync();
-    const validVars = p.variants.filter(v => (v.name || '').trim());
-    if (!validVars.length) { toast('لا توجد أنواع صالحة للفصل'); return; }
-    const includeBaseName = confirm(
-      `سيتم تحويل (${validVars.length}) أنواع إلى منتجات مستقلة منفصلة.\n\n` +
-      `هل تريدين دمج اسم المنتج الأساسي "${p.name.trim()}" مع اسم كل نوع؟\n` +
-      `• موافق = الاسم يصبح: (اسم المنتج - اسم النوع)\n` +
-      `• إلغاء = استخدام اسم النوع فقط كاسم للمنتج المستقل`
-    );
-
-    const newProducts = validVars.map((v, idx) => buildStandaloneFromVariant(v, idx, includeBaseName));
-
-    const existingIdx = D.products.findIndex(x => x.id === p.id);
-    if (existingIdx >= 0) {
-      D.products.splice(existingIdx, 1, ...newProducts);
-    } else {
-      D.products.push(...newProducts);
-    }
-
-    setDirty(true);
-    closeModal();
-    render();
-    toast(`تم فصل ${newProducts.length} منتجات مستقلة ✓ — اضغطي "حفظ ونشر"`);
-  };
-
-  const thumbBox = (src, fallback, size = 48) => src
-    ? `<div style="width:${size}px;height:${size}px;border-radius:10px;overflow:hidden;flex-shrink:0;border:1px solid rgba(0,0,0,.08);background:#fff;display:flex;align-items:center;justify-content:center">
-         <img src="${esc(src)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">
-       </div>`
-    : `<div style="width:${size}px;height:${size}px;border-radius:10px;flex-shrink:0;border:1px solid rgba(0,0,0,.08);background:#f7e8ee;display:flex;align-items:center;justify-content:center;font-size:${Math.round(size * 0.45)}px">
-         ${fallback}
-       </div>`;
-
-  const draw = () => {
-    const mainSrc = p.image ? (previews[p.image] || p.image) : '';
-    const afterProdDisc = discPrice(p.price, p.discount);
-    const singleMode = p.variants.length === 0;
-    const prodOut = p.stock !== null ? p.stock <= 0 : p.inStock === false;
-    md.innerHTML = `<button class="x" id="mx">×</button>
-      <h2 style="margin-top:0;color:var(--pink);font-size:1.45rem">${isNew ? 'منتج جديد' : 'تعديل المنتج'}</h2>
-
-      <label for="fn" style="font-size:14px">اسم المنتج</label>
-      <input type="text" id="fn" value="${esc(p.name)}" placeholder="مثال: شامبو" style="font-size:15px;padding:11px 12px">
-
-      <label for="fc" style="font-size:14px">القسم</label>
-      <select id="fc" style="font-size:15px;padding:11px 12px">${D.categories.map(c =>
-        `<option value="${esc(c.id)}" ${c.id === p.category ? 'selected' : ''}>${esc(c.icon || '')} ${esc(c.name)}</option>`).join('')}</select>
-
-      <label for="fd" style="font-size:14px">وصف المنتج العام (اختياري)</label>
-      <textarea id="fd" rows="3" style="width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:1px solid rgba(0,0,0,.15);font-size:14px;line-height:1.6" placeholder="وصف مختصر للمنتج...">${esc(p.description || '')}</textarea>
-
-      <label style="font-size:14px">الصورة العامة للمنتج (اختياري)</label>
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px">
-        ${thumbBox(mainSrc, '🛍️', 64)}
-        <input type="file" id="ff" accept="image/*" style="flex:1;min-width:180px;font-size:13px">
-        ${p.image ? '<button type="button" class="btn danger sm" id="fr">إزالة</button>' : ''}
-      </div>
-
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:8px">
-        <div>
-          <label for="fp" style="font-size:14px">السعر (بدون أنواع)</label>
-          <input type="number" id="fp" min="0" value="${p.price || 0}" style="width:100%;box-sizing:border-box;font-size:15px;padding:11px 12px">
-        </div>
-        <div>
-          <label for="fdisc" style="font-size:14px">نسبة الخصم %</label>
-          <input type="number" id="fdisc" min="0" max="99" value="${clampDisc(p.discount || 0)}" style="width:100%;box-sizing:border-box;font-size:15px;padding:11px 12px">
-        </div>
-        <div>
-          <label for="fstock" style="font-size:14px">الكمية المتوفرة (اتركيها فارغة = مفتوح)</label>
-          <input type="number" id="fstock" min="0" value="${p.stock !== null ? p.stock : ''}" placeholder="مثال: 10" style="width:100%;box-sizing:border-box;font-size:15px;padding:11px 12px">
-        </div>
-      </div>
-
-      ${singleMode ? `
-        <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-          <label style="margin:0;display:inline-flex;align-items:center;gap:6px;font-size:14px;cursor:pointer">
-            <input type="checkbox" id="finstock" ${!prodOut ? 'checked' : ''}> متوفر للطلب
-          </label>
-          ${prodOut ? '<span style="color:#c92a2a;font-size:13px;font-weight:700">سيظهر في المتجر: غير متوفر</span>' : ''}
-        </div>
-      ` : '<input type="checkbox" id="finstock" checked style="display:none">'}
-
-      ${clampDisc(p.discount || 0) > 0 && singleMode
-        ? `<div style="margin-top:6px;font-size:13px;color:#157347;font-weight:600">السعر بعد الخصم: ${fmt(afterProdDisc)} ${esc(D.settings.currency || '')}</div>`
-        : ''}
-
-      <label style="margin-top:16px;font-size:14.5px">الأنواع (لكل نوع اسم، سعر، خصم %، الكمية بالمخزون، وصف، مواصفات، طريقة استعمال، وصورة)</label>
-      <div id="vs" style="display:flex;flex-direction:column;gap:14px;margin-top:10px">
-        ${p.variants.map((v, i) => {
-          const vSrc = v.image ? (previews[v.image] || v.image) : '';
-          const effD = effectiveVarDisc(p, v);
-          const vFinal = discPrice(v.price, effD);
-          const vStock = parseStock(v.stock);
-          const vOut = vStock !== null ? vStock <= 0 : v.inStock === false;
-          return `<div style="border:1px solid ${vOut ? 'rgba(201,42,42,.35)' : 'rgba(0,0,0,.12)'};border-radius:14px;padding:14px;background:${vOut ? '#fff8f8' : '#fff'};display:flex;flex-direction:column;gap:10px">
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-              ${thumbBox(vSrc, '🖼️', 48)}
-              <input type="text" data-vn="${i}" value="${esc(v.name)}" placeholder="اسم النوع" style="flex:1;min-width:150px;font-size:14.5px;padding:10px 12px">
-              <input type="number" data-vp="${i}" min="0" value="${v.price || 0}" placeholder="السعر" title="السعر" style="width:110px;font-size:14.5px;padding:10px 10px">
-              <input type="number" data-vd="${i}" min="0" max="99" value="${clampDisc(v.discount || 0)}" placeholder="خصم %" title="نسبة الخصم %" style="width:86px;font-size:14.5px;padding:10px 8px">
-              <input type="number" data-vst="${i}" min="0" value="${vStock !== null ? vStock : ''}" placeholder="الكمية" title="الكمية المتوفرة (0 = غير متوفر)" style="width:94px;font-size:14.5px;padding:10px 8px">
-            </div>
-            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-              ${effD > 0
-                ? `<div style="font-size:13px;color:#157347;font-weight:600">بعد الخصم (${effD}%): ${fmt(vFinal)} ${esc(D.settings.currency || '')}</div>`
-                : '<div></div>'}
-              ${vOut
-                ? '<div style="font-size:13px;color:#c92a2a;font-weight:700">غير متوفر (نفدت الكمية)</div>'
-                : (vStock !== null ? `<div style="font-size:13px;color:#495057">المتبقي بالمخزون: <b>${vStock}</b></div>` : '')}
-            </div>
-            <input type="text" data-vdsc="${i}" value="${esc(v.description || '')}" placeholder="وصف مختصر لهذا النوع..." style="width:100%;box-sizing:border-box;font-size:14px;padding:10px 12px">
-            <textarea data-vsp="${i}" rows="3" placeholder="المواصفات الخاصة بهذا النوع..." style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.15);font-size:14px;line-height:1.6">${esc(v.specs || '')}</textarea>
-            <textarea data-vus="${i}" rows="3" placeholder="طريقة الاستعمال الخاصة بهذا النوع..." style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.15);font-size:14px;line-height:1.6">${esc(v.usage || '')}</textarea>
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding-top:8px;border-top:1px dashed rgba(0,0,0,.08)">
-              <label style="margin:0;display:inline-flex;align-items:center;gap:6px;font-size:14px;cursor:pointer">
-                <input type="checkbox" data-vs="${i}" ${!vOut ? 'checked' : ''}> متوفر
-              </label>
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                <input type="file" data-vf="${i}" accept="image/*" style="max-width:210px;font-size:12px">
-                ${v.image ? `<button type="button" class="btn danger sm" data-vr="${i}">إزالة الصورة</button>` : ''}
-                <button type="button" class="btn sec sm" data-vone="${i}" style="background:#eef6ff;color:#1d4ed8;border:1px solid #bfdbfe" title="إخراج هذا النوع فقط كمنتج مستقل">↗ فصل لمنتج مستقل</button>
-                <button type="button" class="btn danger sm" data-vdel="${i}">×</button>
-              </div>
-            </div>
-          </div>`;
-        }).join('')}
-      </div>
-
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
-        <button type="button" class="btn sec" id="va">+ إضافة نوع</button>
-        ${p.variants.length > 0 ? `<button type="button" class="btn sec" id="vsplit" style="background:#eef6ff;color:#1d4ed8;border:1px solid #bfdbfe">↗ فصل كل الأنواع كمنتجات مستقلة</button>` : ''}
-      </div>
-
-      <label for="fsp" style="margin-top:18px;font-size:14px">المواصفات العامة للمنتج (تظهر في الأسفل إذا لم يحدد للنوع)</label>
-      <textarea id="fsp" rows="4" style="width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:1px solid rgba(0,0,0,.15);font-size:14px;line-height:1.65" placeholder="مثال: الحجم 300 مل، مناسب للشعر العادي، خالٍ من السلفات...">${esc(p.specs || '')}</textarea>
-
-      <label for="fus" style="margin-top:12px;font-size:14px">طريقة الاستعمال العامة للمنتج (تظهر في الأسفل إذا لم يحدد للنوع)</label>
-      <textarea id="fus" rows="4" style="width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:1px solid rgba(0,0,0,.15);font-size:14px;line-height:1.65" placeholder="مثال: يُوضع على شعر مبلل ويُدلّك بلطف ثم يُشطف بالماء...">${esc(p.usage || '')}</textarea>
-
-      <div class="row" style="margin-top:22px">
-        <button type="button" class="btn" id="fs" style="padding:10px 24px;font-size:15px">موافق</button>
-        <button type="button" class="btn sec" id="fcn" style="padding:10px 20px;font-size:15px">إلغاء</button>
-      </div>`;
-
-    md.querySelector('#mx').onclick = md.querySelector('#fcn').onclick = closeModal;
-    md.querySelector('#fdisc').onchange = () => { sync(); draw(); };
-    const inStockBox = getMainInStockEl();
-    if (inStockBox) {
-      inStockBox.onchange = () => {
-        if (!inStockBox.checked) {
-          p.stock = 0;
-          p.inStock = false;
-        } else {
-          if (p.stock === 0) p.stock = 1;
-          p.inStock = true;
-        }
-        sync();
-        draw();
-      };
-    }
-    md.querySelectorAll('[data-vd], [data-vp]').forEach(inp => {
-      inp.onchange = () => { sync(); draw(); };
-    });
-    md.querySelectorAll('[data-vs]').forEach(inp => {
-      inp.onchange = () => {
-        const idx = +inp.dataset.vs;
-        const v = p.variants[idx];
-        if (!v) return;
-        if (!inp.checked) {
-          v.stock = 0;
-          v.inStock = false;
-        } else {
-          if (v.stock === 0) v.stock = 1;
-          v.inStock = true;
-        }
-        sync();
-        draw();
-      };
-    });
-    md.querySelector('#va').onclick = () => { sync(); p.variants.push({ name: '', price: p.price || 0, discount: clampDisc(p.discount || 0), stock: null, description: '', specs: '', usage: '', inStock: true, image: '' }); draw(); };
-    const splitBtn = md.querySelector('#vsplit');
-    if (splitBtn) splitBtn.onclick = splitVariantsToProducts;
-    md.querySelectorAll('[data-vone]').forEach(b => b.onclick = () => splitSingleVariant(+b.dataset.vone));
-    md.querySelectorAll('[data-vdel]').forEach(b => b.onclick = () => { sync(); p.variants.splice(+b.dataset.vdel, 1); draw(); });
-    md.querySelectorAll('[data-vr]').forEach(b => b.onclick = () => { sync(); p.variants[+b.dataset.vr].image = ''; draw(); });
-    md.querySelectorAll('[data-vf]').forEach(inp => {
-      inp.onchange = async e => {
-        const f = e.target.files[0]; if (!f) return;
-        const idx = +inp.dataset.vf;
-        sync();
-        toast('جاري رفع صورة النوع...');
-        try {
-          p.variants[idx].image = await uploadImage(f);
-          toast('تم رفع صورة النوع ✓');
-        } catch (err) {
-          toast('فشل رفع الصورة: ' + err.message);
-        }
-        draw();
-      };
-    });
-    const remImgBtn = md.querySelector('#fr');
-    if (remImgBtn) remImgBtn.onclick = () => { sync(); p.image = ''; draw(); };
-    md.querySelector('#ff').onchange = async e => {
-      const f = e.target.files[0]; if (!f) return;
-      sync(); toast('جاري رفع الصورة...');
-      try { p.image = await uploadImage(f); toast('تم رفع الصورة ✓'); }
-      catch (err) { toast('فشل رفع الصورة: ' + err.message); }
-      draw();
-    };
-    md.querySelector('#fs').onclick = () => {
-      sync();
-      p.name = (p.name || '').trim();
-      p.description = (p.description || '').trim();
-      p.specs = (p.specs || '').trim();
-      p.usage = (p.usage || '').trim();
-      p.discount = clampDisc(p.discount || 0);
-      if (!p.name) { toast('اكتبي اسم المنتج'); return; }
-
-      const stockInputs = [...md.querySelectorAll('[data-vst]')];
-      p.variants = p.variants
-        .filter(v => (v.name || '').trim())
-        .map((v, idx) => {
-          const matchedInp = stockInputs.find(el => +el.dataset.vst === idx);
-          const st = matchedInp ? parseStock(matchedInp.value) : parseStock(v.stock);
-          return {
-            name: v.name.trim(),
-            price: +v.price || 0,
-            discount: clampDisc(v.discount || 0),
-            stock: st,
-            description: (v.description || '').trim(),
-            specs: (v.specs || '').trim(),
-            usage: (v.usage || '').trim(),
-            inStock: st !== null ? st > 0 : (v.inStock !== false),
-            image: v.image || ''
-          };
-        });
-      const names = p.variants.map(v => v.name);
-      if (new Set(names).size !== names.length) { toast('أسماء الأنواع يجب ألا تتكرر'); return; }
-
-      if (p.variants.length > 0) {
-        p.price = 0;
-        p.inStock = p.variants.some(v => isVarAvail(v));
-      } else {
-        const mainInp = getMainStockEl();
-        const mainInBox = getMainInStockEl();
-        p.stock = mainInp ? parseStock(mainInp.value) : parseStock(p.stock);
-        p.inStock = p.stock !== null ? p.stock > 0 : (mainInBox ? mainInBox.checked : true);
-      }
-
-      const savedObj = JSON.parse(JSON.stringify(p));
-      const i = D.products.findIndex(x => x.id === savedObj.id);
-      if (i >= 0) D.products[i] = savedObj;
-      else D.products.push(savedObj);
-
-      setDirty(true);
-      closeModal();
-      render();
-      toast('تم تحديث المنتج في القائمة — اضغطي "حفظ ونشر" لتثبيته');
-    };
-  };
-  draw(); $('#ov').classList.add('show');
-}
-
-/* ---------- start ---------- */
-guess(); fillLogin();
-if (cfg.token && cfg.owner && cfg.repo) connect();
