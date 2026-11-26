@@ -1,17 +1,18 @@
 {
-  "name": "Ldorava",
+  "name": "L'DORA Viva",
   "short_name": "Ldorava",
-  "description": "متجر العناية بالبشرة والمكياج والعطور",
+  "description": "متجر L'DORA Viva للعناية بالبشرة والشعر ومستحضرات التجميل",
   "start_url": "/Ldorava/",
   "scope": "/Ldorava/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#111111",
+  "theme_color": "#d6336c",
   "icons": [
     {
       "src": "icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
