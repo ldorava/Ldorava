@@ -1,41 +1,88 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>لوحة الإدارة</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="row" style="justify-content:space-between;margin-bottom:10px">
+    <h1 style="margin:0;color:var(--pink);font-size:1.4rem">لوحة الإدارة</h1>
+    <div class="row">
+      <a href="stories-admin.html" class="btn sm">📸 إدارة الستوريات</a>
+      <a href="index.html" class="btn sec sm">عرض المتجر</a>
+      <button class="btn sec sm" id="logout" style="display:none">تسجيل الخروج</button>
+    </div>
+  </div>
+
+  <div id="login" class="panel">
+    <h2>الربط مع GitHub</h2>
+    <div class="note">
+      يتم حفظ المنتجات مباشرة داخل مستودع GitHub الخاص بك عبر مفتاح وصول (Token). المفتاح يبقى في متصفحك فقط ولا يُرسل لأي جهة غير GitHub.
+      طريقة إنشائه موجودة في ملف README.
+    </div>
+    <label>اسم المستخدم (Owner)</label><input type="text" id="lo" value="ldorava" autocomplete="off">
+    <label>اسم المستودع (Repository)</label><input type="text" id="lr" value="Ldorava" autocomplete="off">
+    <label>الفرع (Branch)</label><input type="text" id="lb" value="main" autocomplete="off">
+    <label>مفتاح الوصول (Token)</label><input type="password" id="lt" autocomplete="off" placeholder="github_pat_...">
+    <div class="row" style="margin-top:14px"><button class="btn" id="connect">دخول</button></div>
+  </div>
+
+  <div id="app" style="display:none">
+    <div class="tabs" id="tabs">
+      <button data-t="products" class="on">المنتجات</button>
+      <button data-t="categories">الأقسام</button>
+      <button data-t="settings">إعدادات المتجر</button>
+    </div>
+    <div id="view"></div>
+  </div>
+</div>
+
+<div class="savebar" id="savebar" style="display:none">
+  <span class="dirty">توجد تغييرات غير منشورة</span>
+  <button class="btn" id="save">حفظ ونشر</button>
+</div>
+
+<div class="overlay" id="ov"><div class="modal" id="md"></div></div>
+<div class="toast" id="toast"></div>
+
 <script>
-(function ensureLoginButtonWorks() {
-  const btn = document.getElementById('connect');
+(function syncAdminLoginFields() {
   const lo = document.getElementById('lo');
   const lr = document.getElementById('lr');
   const lb = document.getElementById('lb');
   const lt = document.getElementById('lt');
-  if (!btn || !lo || !lr || !lb || !lt) return;
+  const connectBtn = document.getElementById('connect');
+  if (!lo || !lr || !lb || !lt) return;
 
-  btn.addEventListener('click', () => {
-    const owner = lo.value.trim();
-    const repo = lr.value.trim();
-    const branch = (lb.value.trim() || 'main');
-    const token = lt.value.trim();
+  const savedOwner  = localStorage.getItem('ldorava_gh_owner')  || localStorage.getItem('gh_owner')  || 'ldorava';
+  const savedRepo   = localStorage.getItem('ldorava_gh_repo')   || localStorage.getItem('gh_repo')   || 'Ldorava';
+  const savedBranch = localStorage.getItem('ldorava_gh_branch') || localStorage.getItem('gh_branch') || 'main';
+  const savedToken  = localStorage.getItem('ldorava_gh_token')  || localStorage.getItem('gh_token')  || '';
 
-    if (!owner || !repo || !token) {
-      alert('يرجى إدخال اسم المستخدم والمستودع ومفتاح Token');
-      return;
-    }
+  if (!lo.value.trim()) lo.value = savedOwner;
+  if (!lr.value.trim()) lr.value = savedRepo;
+  if (!lb.value.trim()) lb.value = savedBranch;
+  if (!lt.value.trim() && savedToken) lt.value = savedToken;
 
+  const saveFields = () => {
     try {
-      localStorage.setItem('ldorava_gh_owner', owner);
-      localStorage.setItem('ldorava_gh_repo', repo);
-      localStorage.setItem('ldorava_gh_branch', branch);
-      localStorage.setItem('ldorava_gh_token', token);
-    } catch (_) {}
-
-    // إذا لم يقم admin.js بإخفاء شاشة الدخول خلال نصف ثانية، أظهر واجهة الإدارة مباشرة
-    setTimeout(() => {
-      const loginEl = document.getElementById('login');
-      const appEl = document.getElementById('app');
-      const logoutEl = document.getElementById('logout');
-      if (loginEl && appEl && getComputedStyle(loginEl).display !== 'none') {
-        loginEl.style.display = 'none';
-        appEl.style.display = 'block';
-        if (logoutEl) logoutEl.style.display = 'inline-block';
+      localStorage.setItem('ldorava_gh_owner', lo.value.trim());
+      localStorage.setItem('ldorava_gh_repo', lr.value.trim());
+      localStorage.setItem('ldorava_gh_branch', lb.value.trim() || 'main');
+      if (lt.value.trim()) {
+        localStorage.setItem('ldorava_gh_token', lt.value.trim());
       }
-    }, 500);
-  });
+    } catch (_) {}
+  };
+
+  [lo, lr, lb, lt].forEach(inp => inp.addEventListener('input', saveFields));
+  if (connectBtn) connectBtn.addEventListener('click', saveFields, true);
 })();
 </script>
+<script src="admin.js"></script>
+</body>
+</html>
