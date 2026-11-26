@@ -1,0 +1,26 @@
+[
+  {
+    "id": "story1",
+    "title": "عروض اليوم 🔥",
+    "cover": "https://ldorava.github.io/Ldorava/icon-512.png",
+    "slides": [
+      {
+        "image": "https://ldorava.github.io/Ldorava/icon-512.png",
+        "caption": "خصومات خاصة على باقات العناية بالبشرة لفترة محدودة!",
+        "productId": ""
+      }
+    ]
+  },
+  {
+    "id": "story2",
+    "title": "الأكثر مبيعاً ✨",
+    "cover": "https://ldorava.github.io/Ldorava/icon-512.png",
+    "slides": [
+      {
+        "image": "https://ldorava.github.io/Ldorava/icon-512.png",
+        "caption": "اكتشفي مجموعتنا الأكثر طلباً لعلاج التساقط وتقوية الشعر.",
+        "productId": ""
+      }
+    ]
+  }
+]
