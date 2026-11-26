@@ -137,7 +137,6 @@
         </div>
         <div class="row">
           <button class="btn" id="addStoryBtn" type="button">+ ستوري جديد</button>
-          <button class="btn sec" id="resetSeenBtn" type="button" title="إعادة ضبط عداد 42 ساعة للستوريات المشاهدة على هذا المتصفح">🔄 إعادة الستوري</button>
           <button class="btn" id="publishGithubBtn" type="button">🚀 نشر لـ GitHub</button>
           <button class="btn sec" id="downloadJsonBtn" type="button">⬇ تحميل stories.json</button>
         </div>
@@ -324,6 +323,7 @@
           <div class="row" style="justify-content: space-between; margin-bottom: 10px;">
             <strong>${esc(st.title || ("ستوري " + (sIdx + 1)))}</strong>
             <div class="row">
+              <button class="btn sec sm" type="button" onclick="resetSingleStory(${sIdx})" title="إعادة ضبط عداد 42 ساعة لهذا الستوري فقط">🔄 إعادة الستوري</button>
               <button class="btn sec sm" type="button" onclick="addSlide(${sIdx})">+ شريحة</button>
               <button class="btn danger sm" type="button" onclick="delStory(${sIdx})">حذف</button>
             </div>
@@ -359,7 +359,7 @@
                     <label>صورة أو فيديو الشريحة</label>
                     <div class="row">
                       <input type="text" style="flex: 1;" value="${esc(mediaVal)}" oninput="stories[${sIdx}].slides[${slIdx}].media=this.value; activeStory=${sIdx}; activeSlide=${slIdx}; updatePreview();">
-                      <input type="file" accept="image/*,video/mp4,video/webm" style="width: auto; padding: 5px;" onchange="onSlideMediaPick(event, ${sIdx},${slIdx})">
+                      <input type="file" accept="image/*,video/mp4,video/webm" style="width: auto; padding: 5px;" onchange="onSlideMediaPick(event, ${sIdx}, ${slIdx})">
                     </div>
                   </div>
                   <div>
@@ -381,6 +381,26 @@
 
       updatePreview();
     }
+
+    window.resetSingleStory = (sIdx) => {
+      const st = stories[sIdx];
+      const storyId = String(st?.id || "").trim();
+      if (!storyId) {
+        toast("هذا الستوري لا يملك معرف ID");
+        return;
+      }
+      try {
+        const raw = localStorage.getItem(SEEN_STORAGE_KEY);
+        const map = raw ? JSON.parse(raw) : {};
+        if (map && typeof map === "object" && !Array.isArray(map)) {
+          delete map[storyId];
+          localStorage.setItem(SEEN_STORAGE_KEY, JSON.stringify(map));
+        }
+        toast(`تمت إعادة ضبط الستوري: ${st.title || storyId} ✅`);
+      } catch {
+        toast("تعذر إعادة الضبط على هذا المتصفح");
+      }
+    };
 
     window.onCoverPick = async (e, sIdx) => {
       const f = e.target.files?.[0];
@@ -490,16 +510,6 @@
         throw new Error(`فشل رفع ${path}: ${err.slice(0, 140)}`);
       }
     }
-
-    document.getElementById("resetSeenBtn").onclick = () => {
-      try {
-        localStorage.removeItem(SEEN_STORAGE_KEY);
-        localStorage.removeItem("ldorava_seen_stories");
-        toast("تمت إعادة ضبط الستوريات المشاهدة (عداد 42 ساعة) ✅");
-      } catch {
-        toast("تعذر إعادة الضبط على هذا المتصفح");
-      }
-    };
 
     publishBtn.onclick = async () => {
       saveGhPrefs();
