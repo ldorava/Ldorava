@@ -340,4 +340,369 @@
     .ld-msg.bot {
       align-self: flex-end;
       background: #ffffff;
-      color: #1f2937
+      color: #1f2937;
+      border: 1px solid #fce7f3;
+    }
+
+    #ldorava-chat-form {
+      display: flex;
+      border-top: 1px solid #e5e7eb;
+      background: #ffffff;
+    }
+
+    #ldorava-chat-input {
+      flex: 1;
+      border: none;
+      padding: 10px 12px;
+      font-size: 13.5px;
+      outline: none;
+      font-family: inherit;
+    }
+
+    #ldorava-chat-send {
+      border: none;
+      background: #d6336c;
+      color: #ffffff;
+      padding: 0 15px;
+      cursor: pointer;
+      font-size: 13.5px;
+      font-weight: bold;
+      font-family: inherit;
+    }
+  </style>
+
+  <button id="ldorava-chat-btn" type="button">💬 مساعد L'DORA</button>
+
+  <div id="ldorava-chat-box" dir="rtl">
+    <div id="ldorava-chat-header">
+      <span>مساعد متجر L'DORA Viva</span>
+      <button id="ldorava-chat-close" type="button" aria-label="إغلاق">×</button>
+    </div>
+    <div id="ldorava-chat-messages">
+      <div class="ld-msg bot">أهلاً بك في L'DORA Viva! اسألني عن المنتجات والأسعار والمواصفات.</div>
+    </div>
+    <form id="ldorava-chat-form">
+      <input id="ldorava-chat-input" type="text" placeholder="اكتب سؤالك هنا..." autocomplete="off" />
+      <button id="ldorava-chat-send" type="submit">إرسال</button>
+    </form>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    let deferredPrompt;
+    const installBtn = document.getElementById('installAppBtn');
+    const iosOv = document.getElementById('iosInstallOv');
+
+    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true;
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js');
+      });
+    }
+
+    if (isIos && !isStandalone && installBtn) {
+      installBtn.style.display = 'inline-block';
+    }
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      if (installBtn) {
+        installBtn.style.display = 'inline-block';
+      }
+    });
+
+    window.addEventListener('appinstalled', () => {
+      deferredPrompt = null;
+      if (installBtn) installBtn.style.display = 'none';
+    });
+
+    if (installBtn) {
+      installBtn.addEventListener('click', async () => {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          await deferredPrompt.userChoice;
+          deferredPrompt = null;
+          installBtn.style.display = 'none';
+          return;
+        }
+        if (isIos && iosOv) {
+          iosOv.style.display = 'flex';
+        }
+      });
+    }
+
+    if (iosOv) {
+      iosOv.addEventListener('click', (e) => {
+        if (e.target.id === 'iosInstallOv') iosOv.style.display = 'none';
+      });
+      document.getElementById('closeIosInstall').onclick = () => iosOv.style.display = 'none';
+      document.getElementById('okIosInstall').onclick = () => iosOv.style.display = 'none';
+    }
+
+    function addProductIdToStoreCart(productId) {
+      if (!productId) return;
+
+      const candidateFns = [
+        window.addToCart,
+        window.addProductToCart,
+        window.handleAddToCart
+      ];
+      for (const fn of candidateFns) {
+        if (typeof fn === "function") {
+          fn(productId);
+          return;
+        }
+      }
+
+      window.dispatchEvent(new CustomEvent("ldorava:addToCart", {
+        detail: { productId }
+      }));
+
+      const countEl = document.getElementById("cartCount");
+      if (countEl) {
+        const current = parseInt(countEl.textContent || "0", 10) || 0;
+        countEl.textContent = String(current + 1);
+      }
+    }
+
+    const PROXY_CHAT_URL = "https://ldorava-ai-proxy-one.vercel.app/chat";
+    const chatBtn = document.getElementById("ldorava-chat-btn");
+    const chatBox = document.getElementById("ldorava-chat-box");
+    const chatClose = document.getElementById("ldorava-chat-close");
+    const chatForm = document.getElementById("ldorava-chat-form");
+    const chatInput = document.getElementById("ldorava-chat-input");
+    const chatMessages = document.getElementById("ldorava-chat-messages");
+    const chatSend = document.getElementById("ldorava-chat-send");
+
+    let chatHistory = [];
+
+    chatBtn.addEventListener("click", () => {
+      chatBox.style.display = chatBox.style.display === "flex" ? "none" : "flex";
+    });
+
+    chatClose.addEventListener("click", () => {
+      chatBox.style.display = "none";
+    });
+
+    function appendChatMessage(text, sender) {
+      const div = document.createElement("div");
+      div.className = `ld-msg ${sender}`;
+      div.textContent = text;
+      chatMessages.appendChild(div);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      return div;
+    }
+
+    chatForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const message = chatInput.value.trim();
+      if (!message) return;
+
+      appendChatMessage(message, "user");
+      chatInput.value = "";
+      chatSend.disabled = true;
+      const loadingMsg = appendChatMessage("يكتب الآن...", "bot");
+
+      try {
+        const res = await fetch(PROXY_CHAT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: message,
+            history: chatHistory.slice(-6)
+          })
+        });
+
+        const data = await res.json();
+        const replyText = data.reply || "عذراً، تعذر الحصول على رد حالياً.";
+        loadingMsg.textContent = replyText;
+
+        if (data.add_to_cart_id) {
+          addProductIdToStoreCart(data.add_to_cart_id);
+        }
+
+        chatHistory.push({ role: "user", text: message });
+        chatHistory.push({ role: "model", text: replyText });
+      } catch (err) {
+        loadingMsg.textContent = "تعذر الاتصال بالمساعد حالياً، حاول مرة أخرى.";
+      } finally {
+        chatSend.disabled = false;
+        chatInput.focus();
+      }
+    });
+
+    (function initLdoravaStories() {
+      const STORIES_URL = "./data/stories.json";
+      const bar = document.getElementById("storiesBar");
+      const viewer = document.getElementById("storyViewer");
+      const progressEl = document.getElementById("storyProgress");
+      const titleEl = document.getElementById("storyViewerTitle");
+      const mediaEl = document.getElementById("storyMedia");
+      const videoEl = document.getElementById("storyVideo");
+      const captionEl = document.getElementById("storyCaption");
+      const ctaBtn = document.getElementById("storyCtaBtn");
+
+      let storiesData = [];
+      let currentStoryIdx = 0;
+      let currentSlideIdx = 0;
+      let slideTimer = null;
+      const SLIDE_DURATION = 5000;
+
+      function getSeenSet() {
+        try {
+          return new Set(JSON.parse(localStorage.getItem("ldorava_seen_stories") || "[]"));
+        } catch {
+          return new Set();
+        }
+      }
+
+      function markSeen(id) {
+        const seen = getSeenSet();
+        seen.add(id);
+        localStorage.setItem("ldorava_seen_stories", JSON.stringify([...seen]));
+        renderStoriesBar();
+      }
+
+      function renderStoriesBar() {
+        if (!storiesData.length || !bar) return;
+        const seen = getSeenSet();
+        bar.style.display = "flex";
+        bar.innerHTML = storiesData.map((st, idx) => `
+          <div class="story-item" data-idx="${idx}">
+            <div class="story-ring ${seen.has(st.id) ? "seen" : ""}">
+              <img src="${st.cover}" alt="${st.title}" loading="lazy">
+            </div>
+            <span class="story-title">${st.title}</span>
+          </div>
+        `).join("");
+
+        bar.querySelectorAll(".story-item").forEach(el => {
+          el.onclick = () => openStory(parseInt(el.dataset.idx, 10));
+        });
+      }
+
+      function openStory(storyIdx) {
+        currentStoryIdx = storyIdx;
+        currentSlideIdx = 0;
+        viewer.style.display = "flex";
+        showSlide();
+      }
+
+      function closeStory() {
+        clearTimeout(slideTimer);
+        if (videoEl) {
+          videoEl.pause();
+          videoEl.currentTime = 0;
+        }
+        viewer.style.display = "none";
+      }
+
+      function showSlide() {
+        clearTimeout(slideTimer);
+        const story = storiesData[currentStoryIdx];
+        if (!story || !Array.isArray(story.slides) || !story.slides.length) {
+          return closeStory();
+        }
+
+        markSeen(story.id);
+        const slide = story.slides[currentSlideIdx];
+        titleEl.textContent = story.title || "";
+        captionEl.textContent = slide.caption || "";
+
+        if (slide.productId) {
+          ctaBtn.style.display = "inline-block";
+          ctaBtn.onclick = () => {
+            closeStory();
+            addProductIdToStoreCart(slide.productId);
+          };
+        } else {
+          ctaBtn.style.display = "none";
+        }
+
+        progressEl.innerHTML = story.slides.map((_, i) => `
+          <div class="story-bar-seg">
+            <div class="story-bar-fill" style="width:${i < currentSlideIdx ? "100%" : "0%"}"></div>
+          </div>
+        `).join("");
+
+        const mediaUrl = slide.media || slide.image || story.cover || "";
+        const isVideo = slide.type === "video" || /\.(mp4|webm|mov)(\?.*)?$/i.test(mediaUrl);
+
+        if (isVideo && videoEl) {
+          mediaEl.style.display = "none";
+          mediaEl.src = "";
+          videoEl.style.display = "block";
+          videoEl.src = mediaUrl;
+          videoEl.currentTime = 0;
+          videoEl.play().catch(() => {});
+          videoEl.onended = nextSlide;
+        } else {
+          if (videoEl) {
+            videoEl.pause();
+            videoEl.style.display = "none";
+            videoEl.src = "";
+            videoEl.onended = null;
+          }
+          mediaEl.style.display = "block";
+          mediaEl.src = mediaUrl;
+
+          requestAnimationFrame(() => {
+            const fills = progressEl.querySelectorAll(".story-bar-fill");
+            if (fills[currentSlideIdx]) {
+              fills[currentSlideIdx].style.transition = `width ${SLIDE_DURATION}ms linear`;
+              fills[currentSlideIdx].style.width = "100%";
+            }
+          });
+
+          slideTimer = setTimeout(nextSlide, SLIDE_DURATION);
+        }
+      }
+
+      function nextSlide() {
+        const story = storiesData[currentStoryIdx];
+        if (!story) return closeStory();
+        if (currentSlideIdx + 1 < story.slides.length) {
+          currentSlideIdx++;
+          showSlide();
+        } else if (currentStoryIdx + 1 < storiesData.length) {
+          currentStoryIdx++;
+          currentSlideIdx = 0;
+          showSlide();
+        } else {
+          closeStory();
+        }
+      }
+
+      function prevSlide() {
+        if (currentSlideIdx > 0) {
+          currentSlideIdx--;
+          showSlide();
+        } else if (currentStoryIdx > 0) {
+          currentStoryIdx--;
+          currentSlideIdx = storiesData[currentStoryIdx].slides.length - 1;
+          showSlide();
+        }
+      }
+
+      document.getElementById("closeStoryBtn").onclick = closeStory;
+      document.getElementById("storyNextZone").onclick = nextSlide;
+      document.getElementById("storyPrevZone").onclick = prevSlide;
+
+      fetch(STORIES_URL + "?v=" + Date.now())
+        .then(r => r.ok ? r.json() : [])
+        .then(data => {
+          if (Array.isArray(data) && data.length) {
+            storiesData = data;
+            renderStoriesBar();
+          }
+        })
+        .catch(() => {});
+    })();
+  </script>
+</body>
+</html>
