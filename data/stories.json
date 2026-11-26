@@ -30,5 +30,21 @@
         "type": "video"
       }
     ]
+  },
+  {
+    "id": "story-1795678482121",
+    "title": "مسك لتفتيح الوجه والرقبة",
+    "cover": "data/stories-media/poster-1795678504555.jpg",
+    "slides": [
+      {
+        "media": "data/stories-media/1795678504375-1001109070.mp4",
+        "caption": "جمالك يستحق تألقا فريدا . ماسك ليدورا لتفتيح الوجه و الرقبة بالرمان، هدية من قلب الطبيعة، بسحر الخلايا الجذعية للرمان و التقنية النانو الجزيئية الجديدة، يحدد بقع البشرة و يحد من هذة البقع\n\nبشكل كبير",
+        "productId": "pmwoxj98vqhk",
+        "variantId": "",
+        "variantName": "",
+        "poster": "data/stories-media/poster-1795678504555.jpg",
+        "type": "video"
+      }
+    ]
   }
 ]
