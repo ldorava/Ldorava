@@ -137,6 +137,7 @@
         </div>
         <div class="row">
           <button class="btn" id="addStoryBtn" type="button">+ ستوري جديد</button>
+          <button class="btn sec" id="resetSeenBtn" type="button" title="إعادة ضبط عداد 42 ساعة للستوريات المشاهدة على هذا المتصفح">🔄 إعادة الستوري</button>
           <button class="btn" id="publishGithubBtn" type="button">🚀 نشر لـ GitHub</button>
           <button class="btn sec" id="downloadJsonBtn" type="button">⬇ تحميل stories.json</button>
         </div>
@@ -189,6 +190,7 @@
   <script>
     const STORIES_FILE_PATH = "data/stories.json";
     const STORE_FILE_PATH = "./data/store.json";
+    const SEEN_STORAGE_KEY = "ldorava_seen_stories_v2";
 
     let stories = [];
     let products = [];
@@ -488,6 +490,16 @@
         throw new Error(`فشل رفع ${path}: ${err.slice(0, 140)}`);
       }
     }
+
+    document.getElementById("resetSeenBtn").onclick = () => {
+      try {
+        localStorage.removeItem(SEEN_STORAGE_KEY);
+        localStorage.removeItem("ldorava_seen_stories");
+        toast("تمت إعادة ضبط الستوريات المشاهدة (عداد 42 ساعة) ✅");
+      } catch {
+        toast("تعذر إعادة الضبط على هذا المتصفح");
+      }
+    };
 
     publishBtn.onclick = async () => {
       saveGhPrefs();
