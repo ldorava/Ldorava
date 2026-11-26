@@ -1,24 +1,34 @@
 [
   {
-    "id": "story1",
+    "id": "offers-today",
     "title": "عروض اليوم 🔥",
     "cover": "https://ldorava.github.io/Ldorava/icon-512.png",
     "slides": [
       {
         "image": "https://ldorava.github.io/Ldorava/icon-512.png",
-        "caption": "خصومات خاصة على باقات العناية بالبشرة لفترة محدودة!",
+        "caption": "اختاري الباقة المناسبة لبشرتك أو شعرك واحصلي على أفضل النتائج.",
         "productId": ""
+      },
+      {
+        "image": "https://ldorava.github.io/Ldorava/icon-512.png",
+        "caption": "منتج مميز متوفر الآن في المتجر — أضيفيه إلى سلتك مباشرة.",
+        "productId": "prod-1"
       }
     ]
   },
   {
-    "id": "story2",
-    "title": "الأكثر مبيعاً ✨",
+    "id": "skin-hair-guide",
+    "title": "اعرفي نوعك ✨",
     "cover": "https://ldorava.github.io/Ldorava/icon-512.png",
     "slides": [
       {
         "image": "https://ldorava.github.io/Ldorava/icon-512.png",
-        "caption": "اكتشفي مجموعتنا الأكثر طلباً لعلاج التساقط وتقوية الشعر.",
+        "caption": "اغسلي وجهك واتركيه ساعة بدون أي منتج لملاحظة الجفاف أو اللمعان بوضوح.",
+        "productId": ""
+      },
+      {
+        "image": "https://ldorava.github.io/Ldorava/icon-512.png",
+        "caption": "محتارة أي صابون أو مجموعة تناسبك؟ اسألي مساعد L'DORA في أسفل الشاشة.",
         "productId": ""
       }
     ]
