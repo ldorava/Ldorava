@@ -12,168 +12,65 @@
       --card: #ffffff;
       --text: #1f2937;
       --muted: #6b7280;
-      --border: #f3e8ff;
     }
     * { box-sizing: border-box; font-family: system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif; }
     body { margin: 0; background: var(--bg); color: var(--text); padding: 16px; }
-    .container { max-width: 1120px; margin: 0 auto; }
-    header {
-      background: var(--card);
-      padding: 16px 20px;
-      border-radius: 16px;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.05);
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 18px;
-    }
-    h1 { margin: 0; font-size: 1.25rem; color: var(--pink); }
-    .sub { font-size: 0.85rem; color: var(--muted); margin-top: 4px; }
-    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
-    button, select, input, textarea {
-      font-family: inherit;
-    }
-    .btn {
-      border: none;
-      border-radius: 10px;
-      padding: 10px 14px;
-      font-size: 0.9rem;
-      font-weight: 700;
-      cursor: pointer;
-      background: var(--pink);
-      color: #fff;
-      transition: 0.15s;
-    }
-    .btn:hover { background: var(--pink-dark); }
-    .btn.sec { background: #f3f4f6; color: var(--text); }
-    .btn.sec:hover { background: #e5e7eb; }
-    .btn.danger { background: #fee2e2; color: #b91c1c; }
-    .btn.danger:hover { background: #fecaca; }
-    .btn.sm { padding: 6px 10px; font-size: 0.8rem; border-radius: 8px; }
-
-    .layout {
-      display: grid;
-      grid-template-columns: 1.35fr 0.85fr;
-      gap: 18px;
-      align-items: start;
-    }
-    @media (max-width: 900px) {
-      .layout { grid-template-columns: 1fr; }
-    }
-
-    .story-box {
+    .wrap { max-width: 1080px; margin: 0 auto; }
+    .box {
       background: var(--card);
       border-radius: 16px;
       padding: 16px;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.05);
-      margin-bottom: 16px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
+      margin-bottom: 14px;
       border: 1px solid #fce7f3;
     }
-    .story-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid #f3f4f6;
-      margin-bottom: 14px;
-    }
-    .grid-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-    @media (max-width: 600px) {
-      .grid-2 { grid-template-columns: 1fr; }
-    }
-    label {
-      display: block;
-      font-size: 0.82rem;
-      font-weight: 700;
-      color: #374151;
-      margin-bottom: 4px;
-    }
-    input[type="text"], select, textarea {
+    h1 { margin: 0 0 4px; font-size: 1.2rem; color: var(--pink); }
+    .muted { font-size: 0.85rem; color: var(--muted); }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 720px) { .grid-2 { grid-template-columns: 1fr; } }
+    label { display: block; font-size: 0.82rem; font-weight: 700; margin-bottom: 4px; color: #374151; }
+    input, select, textarea {
       width: 100%;
       border: 1px solid #d1d5db;
       border-radius: 10px;
       padding: 9px 11px;
       font-size: 0.9rem;
       background: #fff;
+      font-family: inherit;
     }
-    textarea { min-height: 68px; resize: vertical; }
-
-    .slides-list {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-top: 12px;
+    textarea { min-height: 64px; resize: vertical; }
+    .btn {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--pink);
+      color: #fff;
+      font-size: 0.88rem;
+      font-family: inherit;
     }
-    .slide-card {
+    .btn:hover { background: var(--pink-dark); }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn.sec { background: #f3f4f6; color: var(--text); }
+    .btn.sec:hover { background: #e5e7eb; }
+    .btn.danger { background: #fee2e2; color: #b91c1c; }
+    .btn.danger:hover { background: #fecaca; }
+    .btn.sm { padding: 6px 10px; font-size: 0.8rem; border-radius: 8px; }
+    .slide-item {
       background: #fdf8fb;
       border: 1px solid #f5d0fe;
       border-radius: 12px;
       padding: 12px;
+      margin-top: 10px;
     }
-    .slide-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-      font-weight: 700;
-      font-size: 0.88rem;
-      color: var(--pink);
-    }
-
-    /* معاينة إنستغرام */
-    .preview-panel {
-      background: var(--card);
-      border-radius: 16px;
-      padding: 16px;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.05);
-      position: sticky;
-      top: 16px;
-    }
-    .mini-bar {
-      display: flex;
-      gap: 10px;
-      overflow-x: auto;
-      padding-bottom: 12px;
-      margin-bottom: 14px;
-      border-bottom: 1px solid #f3f4f6;
-    }
-    .mini-story {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      width: 60px;
-      flex-shrink: 0;
-      cursor: pointer;
-      font-size: 0.72rem;
-      text-align: center;
-    }
-    .mini-ring {
-      width: 52px;
-      height: 52px;
-      border-radius: 50%;
-      padding: 2px;
-      background: linear-gradient(45deg, #f59e0b, #d6336c, #9333ea);
-    }
-    .mini-ring img {
+    .layout { display: grid; grid-template-columns: 1.3fr 0.9fr; gap: 16px; align-items: start; }
+    @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+    .phone {
       width: 100%;
-      height: 100%;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 2px solid #fff;
-      background: #fff;
-    }
-    .phone-frame {
-      width: 100%;
-      max-width: 310px;
-      height: 460px;
+      max-width: 300px;
+      height: 450px;
       margin: 0 auto;
       border-radius: 22px;
       background: #111;
@@ -183,9 +80,9 @@
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      box-shadow: 0 12px 28px rgba(0,0,0,0.18);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
     }
-    .phone-bg {
+    .phone img, .phone video {
       position: absolute;
       inset: 0;
       width: 100%;
@@ -193,42 +90,25 @@
       object-fit: cover;
       z-index: 1;
     }
-    .phone-top, .phone-bottom {
-      position: relative;
-      z-index: 2;
-      padding: 12px;
-    }
+    .phone-top, .phone-bot { position: relative; z-index: 2; padding: 12px; }
     .phone-top {
-      background: linear-gradient(to bottom, rgba(0,0,0,0.65), transparent);
-      font-size: 0.85rem;
+      background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), transparent);
       font-weight: 700;
+      font-size: 0.86rem;
     }
-    .phone-bottom {
-      background: linear-gradient(to top, rgba(0,0,0,0.85), transparent);
+    .phone-bot {
+      background: linear-gradient(to top, rgba(0, 0, 0, 0.88), transparent);
       text-align: center;
     }
-    .phone-caption { font-size: 0.85rem; line-height: 1.5; margin-bottom: 8px; }
-    .phone-cta {
+    .badge-pending {
       display: inline-block;
-      background: var(--pink);
-      color: #fff;
-      padding: 6px 14px;
-      border-radius: 999px;
+      margin-top: 8px;
       font-size: 0.78rem;
+      background: #fef3c7;
+      color: #92400e;
+      padding: 4px 10px;
+      border-radius: 999px;
       font-weight: 700;
-    }
-    .json-box {
-      margin-top: 16px;
-      background: #111827;
-      color: #f9fafb;
-      border-radius: 12px;
-      padding: 12px;
-      font-size: 0.75rem;
-      direction: ltr;
-      text-align: left;
-      max-height: 220px;
-      overflow: auto;
-      white-space: pre;
     }
     .toast {
       position: fixed;
@@ -240,88 +120,162 @@
       padding: 10px 18px;
       border-radius: 999px;
       font-size: 0.85rem;
-      z-index: 99999;
       display: none;
+      z-index: 99999;
+      max-width: 90vw;
+      text-align: center;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <div>
-        <h1>📸 لوحة إضافة وإدارة الستوريات — L'DORA Viva</h1>
-        <div class="sub">أضف الستوريات والشرائح، عاين شكلها مباشرة، ثم انسخ أو حمّل <code>data/stories.json</code> لرفعه إلى GitHub.</div>
+  <div class="wrap">
+    <div class="box">
+      <div class="row" style="justify-content: space-between;">
+        <div>
+          <h1>🎬 إضافة الستوريات بضغطة زر — L'DORA Viva</h1>
+          <div class="muted">اختر صورة أو فيديو من جهازك، اكتب النص، وانشره مباشرة إلى GitHub مع تحديث <code>data/stories.json</code> تلقائياً.</div>
+        </div>
+        <div class="row">
+          <button class="btn" id="addStoryBtn" type="button">+ ستوري جديد</button>
+          <button class="btn" id="publishGithubBtn" type="button">🚀 نشر لـ GitHub</button>
+          <button class="btn sec" id="downloadJsonBtn" type="button">⬇ تحميل stories.json</button>
+        </div>
       </div>
-      <div class="actions">
-        <button class="btn" id="addStoryBtn" type="button">+ ستوري جديد</button>
-        <button class="btn sec" id="loadExistingBtn" type="button">↻ تحميل الحالي</button>
-        <button class="btn sec" id="copyJsonBtn" type="button">📋 نسخ JSON</button>
-        <button class="btn" id="downloadJsonBtn" type="button">⬇ تحميل stories.json</button>
-      </div>
-    </header>
 
-    <div class="layout">
-      <div id="editorColumn"></div>
+      <div id="pendingInfo" class="badge-pending" style="display: none;"></div>
 
-      <aside class="preview-panel">
-        <div class="mini-bar" id="miniBar"></div>
-        <div class="phone-frame">
-          <img class="phone-bg" id="prevImg" src="icon-512.png" alt="">
-          <div class="phone-top" id="prevTitle">معاينة الستوري</div>
-          <div class="phone-bottom">
-            <div class="phone-caption" id="prevCaption">اختر أو أضف شريحة للمعاينة</div>
-            <span class="phone-cta" id="prevCta" style="display:none;">🛒 أضيفي للسلة</span>
+      <details open style="margin-top: 12px;">
+        <summary style="cursor: pointer; font-weight: 700; font-size: 0.88rem; color: var(--pink);">⚙️ إعدادات GitHub</summary>
+        <div class="grid-2" style="margin-top: 10px;">
+          <div>
+            <label>المستودع (Owner/Repo)</label>
+            <input id="ghRepo" type="text" value="ldorava/Ldorava">
+          </div>
+          <div>
+            <label>الفرع (Branch)</label>
+            <input id="ghBranch" type="text" value="main">
+          </div>
+          <div>
+            <label>مجلد حفظ الصور والفيديوهات</label>
+            <input id="ghMediaDir" type="text" value="data/stories-media">
+          </div>
+          <div>
+            <label>GitHub Personal Access Token</label>
+            <input id="ghToken" type="password" placeholder="ghp_...">
           </div>
         </div>
-        <div style="display:flex;justify-content:center;gap:8px;margin-top:10px;">
-          <button class="btn sec sm" id="prevSlideBtn" type="button">السابقة</button>
-          <span id="slideCounter" style="font-size:0.82rem;line-height:28px;color:var(--muted);">0 / 0</span>
-          <button class="btn sec sm" id="nextSlideBtn" type="button">التالية</button>
-        </div>
+      </details>
+    </div>
 
-        <div class="json-box" id="jsonPreview"></div>
-      </aside>
+    <div class="layout">
+      <div id="storiesEditor"></div>
+
+      <div class="box" style="position: sticky; top: 14px;">
+        <div class="phone">
+          <img id="prevImg" src="icon-512.png" alt="">
+          <video id="prevVid" playsinline controls style="display: none;"></video>
+          <div class="phone-top" id="prevTitle">معاينة</div>
+          <div class="phone-bot">
+            <div id="prevCaption" style="font-size: 0.84rem; line-height: 1.5; margin-bottom: 8px;"></div>
+            <span id="prevCta" style="display: none; background: var(--pink); color: #fff; padding: 5px 12px; border-radius: 999px; font-size: 0.78rem; font-weight: 700;">🛒 أضيفي للسلة</span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
   <div class="toast" id="toast"></div>
 
   <script>
-    const STORIES_PATH = "./data/stories.json";
-    const STORE_PATH = "./data/store.json";
+    const STORIES_FILE_PATH = "data/stories.json";
+    const STORE_FILE_PATH = "./data/store.json";
 
     let stories = [];
-    let storeProducts = [];
-    let activeStoryIdx = 0;
-    let activeSlideIdx = 0;
+    let products = [];
+    let pendingUploads = {};
+    let activeStory = 0;
+    let activeSlide = 0;
 
-    const editorCol = document.getElementById("editorColumn");
-    const miniBar = document.getElementById("miniBar");
-    const jsonPreview = document.getElementById("jsonPreview");
+    const editorEl = document.getElementById("storiesEditor");
     const toastEl = document.getElementById("toast");
+    const pendingInfoEl = document.getElementById("pendingInfo");
+    const publishBtn = document.getElementById("publishGithubBtn");
 
-    function showToast(msg) {
+    const ghRepoInput = document.getElementById("ghRepo");
+    const ghBranchInput = document.getElementById("ghBranch");
+    const ghMediaDirInput = document.getElementById("ghMediaDir");
+    const ghTokenInput = document.getElementById("ghToken");
+
+    function toast(msg) {
       toastEl.textContent = msg;
       toastEl.style.display = "block";
-      clearTimeout(showToast._t);
-      showToast._t = setTimeout(() => { toastEl.style.display = "none"; }, 2400);
+      clearTimeout(toast._t);
+      toast._t = setTimeout(() => { toastEl.style.display = "none"; }, 3000);
     }
 
-    function slugifyId(val) {
-      return String(val || "story")
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, "-")
-        .replace(/[^\w\u0600-\u06ff-]/g, "") || ("story-" + Date.now());
+    function updatePendingBadge() {
+      const count = Object.keys(pendingUploads).length;
+      if (count > 0) {
+        pendingInfoEl.style.display = "inline-block";
+        pendingInfoEl.textContent = `ملفات جاهزة للرفع إلى GitHub: ${count}`;
+      } else {
+        pendingInfoEl.style.display = "none";
+      }
     }
 
-    async function loadStoreProducts() {
+    function loadGhPrefs() {
+      ghRepoInput.value = localStorage.getItem("ld_gh_repo") || "ldorava/Ldorava";
+      ghBranchInput.value = localStorage.getItem("ld_gh_branch") || "main";
+      ghMediaDirInput.value = localStorage.getItem("ld_gh_dir") || "data/stories-media";
+      ghTokenInput.value = localStorage.getItem("ld_gh_token") || "";
+    }
+
+    function saveGhPrefs() {
+      localStorage.setItem("ld_gh_repo", ghRepoInput.value.trim());
+      localStorage.setItem("ld_gh_branch", ghBranchInput.value.trim() || "main");
+      localStorage.setItem("ld_gh_dir", ghMediaDirInput.value.trim().replace(/^\/+|\/+$/g, "") || "data/stories-media");
+      localStorage.setItem("ld_gh_token", ghTokenInput.value.trim());
+    }
+
+    [ghRepoInput, ghBranchInput, ghMediaDirInput, ghTokenInput].forEach(el => {
+      el.addEventListener("change", saveGhPrefs);
+    });
+
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const res = String(reader.result || "");
+          const idx = res.indexOf(",");
+          resolve({ base64: idx >= 0 ? res.slice(idx + 1) : res, dataUrl: res });
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function handleFileUpload(file, onAssigned) {
+      if (!file) return;
+      saveGhPrefs();
+      const dir = (ghMediaDirInput.value.trim() || "data/stories-media").replace(/^\/+|\/+$/g, "");
+      const safeName = Date.now() + "-" + file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const repoPath = `${dir}/${safeName}`;
+
+      const { base64, dataUrl } = await fileToBase64(file);
+      pendingUploads[repoPath] = { base64, dataUrl, isVideo: file.type.startsWith("video/") };
+      updatePendingBadge();
+
+      onAssigned(repoPath, dataUrl, file.type.startsWith("video/"));
+      toast("تم تجهيز الملف: " + safeName);
+    }
+
+    async function loadStore() {
       try {
-        const res = await fetch(STORE_PATH + "?v=" + Date.now());
-        if (!res.ok) return;
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : (Array.isArray(data.products) ? data.products : []);
-        storeProducts = list.map((p, i) => ({
+        const r = await fetch(STORE_FILE_PATH + "?v=" + Date.now());
+        if (!r.ok) return;
+        const d = await r.json();
+        const arr = Array.isArray(d) ? d : (Array.isArray(d.products) ? d.products : []);
+        products = arr.map((p, i) => ({
           id: String(p.id ?? p.product_id ?? i + 1),
           name: String(p.title ?? p.name ?? p.product_name ?? ("منتج #" + (i + 1)))
         }));
@@ -330,15 +284,12 @@
 
     async function loadStories() {
       try {
-        const res = await fetch(STORIES_PATH + "?v=" + Date.now());
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length) {
-            stories = data;
-            activeStoryIdx = 0;
-            activeSlideIdx = 0;
-            renderAll();
-            showToast("تم تحميل الستوريات الحالية");
+        const r = await fetch("./" + STORIES_FILE_PATH + "?v=" + Date.now());
+        if (r.ok) {
+          const d = await r.json();
+          if (Array.isArray(d) && d.length) {
+            stories = d;
+            render();
             return;
           }
         }
@@ -348,251 +299,256 @@
         id: "offers-today",
         title: "عروض اليوم 🔥",
         cover: "icon-512.png",
-        slides: [{
-          image: "icon-512.png",
-          caption: "اكتشفي أحدث عروض وباقات L'DORA Viva الآن!",
-          productId: ""
-        }]
+        slides: [{ media: "icon-512.png", caption: "أحدث العروض والمنتجات من L'DORA Viva", productId: "" }]
       }];
-      renderAll();
+      render();
     }
 
-    function renderProductOptions(selectedId) {
-      const opts = [`<option value="">-- بدون زر إضافة للسلة --</option>`];
-      for (const p of storeProducts) {
-        const sel = String(p.id) === String(selectedId) ? "selected" : "";
-        opts.push(`<option value="${p.id}" ${sel}>${p.name} (${p.id})</option>`);
+    function prodOptions(selId) {
+      let html = `<option value="">-- بدون زر شراء --</option>`;
+      for (const p of products) {
+        html += `<option value="${p.id}" ${String(p.id) === String(selId) ? "selected" : ""}>${p.name}</option>`;
       }
-      if (selectedId && !storeProducts.some(p => String(p.id) === String(selectedId))) {
-        opts.push(`<option value="${selectedId}" selected>معرف مخصص: ${selectedId}</option>`);
-      }
-      return opts.join("");
+      return html;
     }
 
-    function renderEditor() {
-      if (!stories.length) {
-        editorCol.innerHTML = `<div class="story-box">لا توجد ستوريات بعد. اضغط على <b>+ ستوري جديد</b>.</div>`;
-        return;
-      }
+    function esc(s) {
+      return String(s ?? "").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
 
-      editorCol.innerHTML = stories.map((st, sIdx) => `
-        <div class="story-box">
-          <div class="story-head">
-            <strong>الستوري #${sIdx + 1}: ${st.title || "بدون عنوان"}</strong>
-            <div style="display:flex;gap:6px;">
-              <button class="btn sec sm" type="button" onclick="previewStory(${sIdx})">👁 معاينة</button>
+    function render() {
+      editorEl.innerHTML = stories.map((st, sIdx) => `
+        <div class="box">
+          <div class="row" style="justify-content: space-between; margin-bottom: 10px;">
+            <strong>${esc(st.title || ("ستوري " + (sIdx + 1)))}</strong>
+            <div class="row">
               <button class="btn sec sm" type="button" onclick="addSlide(${sIdx})">+ شريحة</button>
-              <button class="btn danger sm" type="button" onclick="deleteStory(${sIdx})">حذف</button>
+              <button class="btn danger sm" type="button" onclick="delStory(${sIdx})">حذف</button>
             </div>
           </div>
 
           <div class="grid-2">
             <div>
-              <label>عنوان الستوري (يظهر أسفل الدائرة)</label>
-              <input type="text" value="${escapeAttr(st.title)}" oninput="updateStoryField(${sIdx}, 'title', this.value)">
+              <label>عنوان الستوري</label>
+              <input type="text" value="${esc(st.title)}" oninput="stories[${sIdx}].title=this.value; activeStory=${sIdx}; updatePreview();">
             </div>
             <div>
-              <label>المعرّف (ID فريد بالإنجليزية)</label>
-              <input type="text" value="${escapeAttr(st.id)}" oninput="updateStoryField(${sIdx}, 'id', this.value)">
+              <label>صورة الغلاف (رفع من الجهاز أو مسار)</label>
+              <div class="row">
+                <input type="text" style="flex: 1;" value="${esc(st.cover)}" oninput="stories[${sIdx}].cover=this.value; updatePreview();">
+                <input type="file" accept="image/*" style="width: auto; padding: 5px;" onchange="onCoverPick(event, ${sIdx})">
+              </div>
             </div>
           </div>
 
-          <div style="margin-top:10px;">
-            <label>رابط صورة الغلاف الدائرية (مثلاً <code>icon-512.png</code> أو رابط صورة)</label>
-            <input type="text" value="${escapeAttr(st.cover)}" oninput="updateStoryField(${sIdx}, 'cover', this.value)">
-          </div>
-
-          <div class="slides-list">
-            ${(st.slides || []).map((sl, slIdx) => `
-              <div class="slide-card">
-                <div class="slide-top">
-                  <span>شريحة ${slIdx + 1}</span>
-                  <div style="display:flex;gap:6px;">
-                    <button class="btn sec sm" type="button" onclick="previewSlide(${sIdx}, ${slIdx})">عرض</button>
-                    ${st.slides.length > 1 ? `<button class="btn danger sm" type="button" onclick="deleteSlide(${sIdx}, ${slIdx})">إزالة</button>` : ""}
+          ${(st.slides || []).map((sl, slIdx) => {
+            const mediaVal = sl.media || sl.image || "";
+            return `
+              <div class="slide-item">
+                <div class="row" style="justify-content: space-between; margin-bottom: 6px;">
+                  <strong style="color: var(--pink); font-size: 0.85rem;">شريحة ${slIdx + 1}</strong>
+                  <div class="row">
+                    <button class="btn sec sm" type="button" onclick="activeStory=${sIdx}; activeSlide=${slIdx}; updatePreview();">معاينة</button>
+                    ${st.slides.length > 1 ? `<button class="btn danger sm" type="button" onclick="delSlide(${sIdx},${slIdx})">إزالة</button>` : ""}
                   </div>
                 </div>
-
                 <div class="grid-2">
                   <div>
-                    <label>رابط صورة الشريحة</label>
-                    <input type="text" value="${escapeAttr(sl.image)}" oninput="updateSlideField(${sIdx}, ${slIdx}, 'image', this.value)">
+                    <label>صورة أو فيديو الشريحة</label>
+                    <div class="row">
+                      <input type="text" style="flex: 1;" value="${esc(mediaVal)}" oninput="stories[${sIdx}].slides[${slIdx}].media=this.value; activeStory=${sIdx}; activeSlide=${slIdx}; updatePreview();">
+                      <input type="file" accept="image/*,video/mp4,video/webm" style="width: auto; padding: 5px;" onchange="onSlideMediaPick(event, ${sIdx},${slIdx})">
+                    </div>
                   </div>
                   <div>
                     <label>ربط بمنتج (اختياري)</label>
-                    <select onchange="updateSlideField(${sIdx}, ${slIdx}, 'productId', this.value)">
-                      ${renderProductOptions(sl.productId)}
+                    <select onchange="stories[${sIdx}].slides[${slIdx}].productId=this.value; updatePreview();">
+                      ${prodOptions(sl.productId)}
                     </select>
                   </div>
                 </div>
-
-                <div style="margin-top:8px;">
-                  <label>النص / الوصف الظاهر أسفل الشريحة</label>
-                  <textarea oninput="updateSlideField(${sIdx}, ${slIdx}, 'caption', this.value)">${escapeHtml(sl.caption)}</textarea>
+                <div style="margin-top: 8px;">
+                  <label>النص الظاهر على الشريحة</label>
+                  <textarea oninput="stories[${sIdx}].slides[${slIdx}].caption=this.value; activeStory=${sIdx}; activeSlide=${slIdx}; updatePreview();">${esc(sl.caption)}</textarea>
                 </div>
               </div>
-            `).join("")}
-          </div>
+            `;
+          }).join("")}
         </div>
       `).join("");
+
+      updatePreview();
     }
 
-    function escapeAttr(v) {
-      return String(v ?? "").replace(/"/g, "&quot;");
-    }
-    function escapeHtml(v) {
-      return String(v ?? "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    }
-
-    window.updateStoryField = (sIdx, field, val) => {
-      stories[sIdx][field] = val;
-      syncPreviewAndJson();
+    window.onCoverPick = async (e, sIdx) => {
+      const f = e.target.files?.[0];
+      await handleFileUpload(f, (repoPath, dataUrl) => {
+        stories[sIdx].cover = repoPath;
+        stories[sIdx]._previewCover = dataUrl;
+        render();
+      });
     };
 
-    window.updateSlideField = (sIdx, slIdx, field, val) => {
-      stories[sIdx].slides[slIdx][field] = val;
-      syncPreviewAndJson();
+    window.onSlideMediaPick = async (e, sIdx, slIdx) => {
+      const f = e.target.files?.[0];
+      await handleFileUpload(f, (repoPath, dataUrl, isVideo) => {
+        stories[sIdx].slides[slIdx].media = repoPath;
+        stories[sIdx].slides[slIdx].type = isVideo ? "video" : "image";
+        stories[sIdx].slides[slIdx]._previewUrl = dataUrl;
+        activeStory = sIdx;
+        activeSlide = slIdx;
+        render();
+      });
     };
 
     window.addSlide = (sIdx) => {
-      const cover = stories[sIdx].cover || "icon-512.png";
-      stories[sIdx].slides.push({
-        image: cover,
-        caption: "شريحة جديدة",
-        productId: ""
-      });
-      activeStoryIdx = sIdx;
-      activeSlideIdx = stories[sIdx].slides.length - 1;
-      renderAll();
+      stories[sIdx].slides.push({ media: stories[sIdx].cover || "icon-512.png", caption: "", productId: "" });
+      activeStory = sIdx;
+      activeSlide = stories[sIdx].slides.length - 1;
+      render();
     };
 
-    window.deleteSlide = (sIdx, slIdx) => {
+    window.delSlide = (sIdx, slIdx) => {
       stories[sIdx].slides.splice(slIdx, 1);
-      if (activeSlideIdx >= stories[sIdx].slides.length) {
-        activeSlideIdx = Math.max(0, stories[sIdx].slides.length - 1);
-      }
-      renderAll();
+      activeSlide = 0;
+      render();
     };
 
-    window.deleteStory = (sIdx) => {
+    window.delStory = (sIdx) => {
       stories.splice(sIdx, 1);
-      activeStoryIdx = 0;
-      activeSlideIdx = 0;
-      renderAll();
+      activeStory = 0;
+      activeSlide = 0;
+      render();
     };
 
-    window.previewStory = (sIdx) => {
-      activeStoryIdx = sIdx;
-      activeSlideIdx = 0;
-      syncPreviewAndJson();
-    };
+    function getCleanStoriesJson() {
+      return JSON.stringify(stories.map((st, idx) => ({
+        id: String(st.id || ("story-" + (idx + 1))).trim(),
+        title: String(st.title || "").trim(),
+        cover: String(st.cover || "icon-512.png").trim(),
+        slides: (st.slides || []).map(sl => {
+          const m = String(sl.media || sl.image || st.cover || "icon-512.png").trim();
+          const item = {
+            media: m,
+            caption: String(sl.caption || "").trim(),
+            productId: String(sl.productId || "").trim()
+          };
+          if (sl.type === "video" || /\.(mp4|webm|mov)$/i.test(m)) item.type = "video";
+          return item;
+        })
+      })), null, 2);
+    }
 
-    window.previewSlide = (sIdx, slIdx) => {
-      activeStoryIdx = sIdx;
-      activeSlideIdx = slIdx;
-      syncPreviewAndJson();
-    };
+    function updatePreview() {
+      const st = stories[activeStory];
+      const sl = st?.slides?.[activeSlide];
+      const imgEl = document.getElementById("prevImg");
+      const vidEl = document.getElementById("prevVid");
 
-    function syncPreviewAndJson() {
-      miniBar.innerHTML = stories.map((st, idx) => `
-        <div class="mini-story" onclick="previewStory(${idx})">
-          <div class="mini-ring"><img src="${escapeAttr(st.cover || 'icon-512.png')}" alt=""></div>
-          <span>${escapeHtml(st.title || ("ستوري " + (idx + 1)))}</span>
-        </div>
-      `).join("");
+      document.getElementById("prevTitle").textContent = st?.title || "";
+      document.getElementById("prevCaption").textContent = sl?.caption || "";
+      document.getElementById("prevCta").style.display = sl?.productId ? "inline-block" : "none";
 
-      const st = stories[activeStoryIdx];
-      const slides = st?.slides || [];
-      if (!st || !slides.length) {
-        document.getElementById("prevTitle").textContent = "لا توجد شرائح";
-        document.getElementById("prevCaption").textContent = "";
-        document.getElementById("prevCta").style.display = "none";
-        document.getElementById("slideCounter").textContent = "0 / 0";
+      const src = sl?._previewUrl || sl?.media || sl?.image || st?._previewCover || st?.cover || "icon-512.png";
+      const isVid = Boolean(sl?._previewUrl && sl.type === "video") || /\.(mp4|webm|mov)(\?.*)?$/i.test(src);
+
+      if (isVid) {
+        imgEl.style.display = "none";
+        vidEl.style.display = "block";
+        vidEl.src = src;
       } else {
-        if (activeSlideIdx >= slides.length) activeSlideIdx = 0;
-        const sl = slides[activeSlideIdx];
-        document.getElementById("prevImg").src = sl.image || st.cover || "icon-512.png";
-        document.getElementById("prevTitle").textContent = st.title || "";
-        document.getElementById("prevCaption").textContent = sl.caption || "";
-        document.getElementById("prevCta").style.display = sl.productId ? "inline-block" : "none";
-        document.getElementById("slideCounter").textContent = `${activeSlideIdx + 1} / ${slides.length}`;
+        vidEl.pause();
+        vidEl.style.display = "none";
+        imgEl.style.display = "block";
+        imgEl.src = src;
+      }
+    }
+
+    async function putGithubFile(repo, branch, path, base64Content, message, token) {
+      const apiBase = `https://api.github.com/repos/${repo}/contents/${path}`;
+      const headers = {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "Accept": "application/vnd.github+json"
+      };
+
+      let sha = undefined;
+      const checkRes = await fetch(`${apiBase}?ref=${encodeURIComponent(branch)}`, { headers });
+      if (checkRes.ok) {
+        const existing = await checkRes.json();
+        sha = existing.sha;
       }
 
-      const cleanStories = stories.map((stItem, i) => ({
-        id: slugifyId(stItem.id || stItem.title || ("story-" + (i + 1))),
-        title: String(stItem.title || "").trim(),
-        cover: String(stItem.cover || "icon-512.png").trim(),
-        slides: (stItem.slides || []).map(sl => ({
-          image: String(sl.image || stItem.cover || "icon-512.png").trim(),
-          caption: String(sl.caption || "").trim(),
-          productId: String(sl.productId || "").trim()
-        }))
-      }));
+      const body = { message, content: base64Content, branch };
+      if (sha) body.sha = sha;
 
-      jsonPreview.textContent = JSON.stringify(cleanStories, null, 2);
+      const putRes = await fetch(apiBase, { method: "PUT", headers, body: JSON.stringify(body) });
+      if (!putRes.ok) {
+        const err = await putRes.text();
+        throw new Error(`فشل رفع ${path}: ${err.slice(0, 140)}`);
+      }
     }
 
-    function renderAll() {
-      renderEditor();
-      syncPreviewAndJson();
-    }
+    publishBtn.onclick = async () => {
+      saveGhPrefs();
+      const repo = ghRepoInput.value.trim();
+      const branch = ghBranchInput.value.trim() || "main";
+      const token = ghTokenInput.value.trim();
 
-    document.getElementById("addStoryBtn").onclick = () => {
-      const n = stories.length + 1;
-      stories.push({
-        id: "story-" + n + "-" + Math.floor(Math.random() * 100),
-        title: "ستوري جديد " + n,
-        cover: "icon-512.png",
-        slides: [{
-          image: "icon-512.png",
-          caption: "اكتب وصف العرض أو النصيحة هنا",
-          productId: ""
-        }]
-      });
-      activeStoryIdx = stories.length - 1;
-      activeSlideIdx = 0;
-      renderAll();
-    };
+      if (!repo || !token) {
+        toast("أدخل المستودع و GitHub Token أولاً");
+        return;
+      }
 
-    document.getElementById("loadExistingBtn").onclick = loadStories;
-
-    document.getElementById("prevSlideBtn").onclick = () => {
-      const slides = stories[activeStoryIdx]?.slides || [];
-      if (!slides.length) return;
-      activeSlideIdx = (activeSlideIdx - 1 + slides.length) % slides.length;
-      syncPreviewAndJson();
-    };
-
-    document.getElementById("nextSlideBtn").onclick = () => {
-      const slides = stories[activeStoryIdx]?.slides || [];
-      if (!slides.length) return;
-      activeSlideIdx = (activeSlideIdx + 1) % slides.length;
-      syncPreviewAndJson();
-    };
-
-    document.getElementById("copyJsonBtn").onclick = async () => {
+      publishBtn.disabled = true;
       try {
-        await navigator.clipboard.writeText(jsonPreview.textContent);
-        showToast("تم نسخ JSON إلى الحافظة ✅");
-      } catch {
-        showToast("تعذر النسخ التلقائي، انسخ النص من الصندوق الأسفل");
+        toast("جاري رفع الملفات وتحديث stories.json...");
+        for (const [filePath, info] of Object.entries(pendingUploads)) {
+          await putGithubFile(repo, branch, filePath, info.base64, `Add story media ${filePath}`, token);
+        }
+        pendingUploads = {};
+        updatePendingBadge();
+
+        const jsonStr = getCleanStoriesJson();
+        const jsonBase64 = btoa(unescape(encodeURIComponent(jsonStr)));
+        await putGithubFile(repo, branch, STORIES_FILE_PATH, jsonBase64, "Update data/stories.json", token);
+
+        toast("تم النشر إلى GitHub بنجاح ✅");
+      } catch (e) {
+        toast(e.message || "حدث خطأ أثناء النشر");
+      } finally {
+        publishBtn.disabled = false;
       }
     };
 
     document.getElementById("downloadJsonBtn").onclick = () => {
-      const blob = new Blob([jsonPreview.textContent], { type: "application/json;charset=utf-8" });
+      const blob = new Blob([getCleanStoriesJson()], { type: "application/json;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = "stories.json";
       a.click();
       URL.revokeObjectURL(url);
-      showToast("تم تحميل ملف stories.json ✅");
+      toast("تم تحميل stories.json");
+    };
+
+    document.getElementById("addStoryBtn").onclick = () => {
+      stories.push({
+        id: "story-" + Date.now(),
+        title: "ستوري جديد",
+        cover: "icon-512.png",
+        slides: [{ media: "icon-512.png", caption: "", productId: "" }]
+      });
+      activeStory = stories.length - 1;
+      activeSlide = 0;
+      render();
     };
 
     (async () => {
-      await loadStoreProducts();
+      loadGhPrefs();
+      await loadStore();
       await loadStories();
+      updatePendingBadge();
     })();
   </script>
 </body>
