@@ -866,7 +866,7 @@
 
         const jsonStr = getCleanStoriesJson();
         const jsonBase64 = btoa(unescape(encodeURIComponent(jsonStr)));
-        await putGithubFile(repo, branch, STORIES_FILE_PATH, jsonBase4, "Update data/stories.json", token);
+        await putGithubFile(repo, branch, STORIES_FILE_PATH, jsonBase64, "Update data/stories.json", token);
 
         const currentUsed = collectStoriesMediaPaths(stories, repo, branch);
         const filesToDelete = [...initialStoryMediaPaths].filter(p => !currentUsed.has(p));
