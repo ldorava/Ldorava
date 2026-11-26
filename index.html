@@ -536,8 +536,13 @@
       }
     });
 
+    // منطق الستوريات من data/stories.json مع إخفاء الستوري بعد 42 ساعة من مشاهدته
     (function initLdoravaStories() {
       const STORIES_URL = "./data/stories.json";
+      const SEEN_STORAGE_KEY = "ldorava_seen_stories_v2";
+      const EXPIRE_AFTER_MS = 42 * 60 * 60 * 1000;
+      const SLIDE_DURATION = 5000;
+
       const bar = document.getElementById("storiesBar");
       const viewer = document.getElementById("storyViewer");
       const progressEl = document.getElementById("storyProgress");
@@ -547,39 +552,72 @@
       const captionEl = document.getElementById("storyCaption");
       const ctaBtn = document.getElementById("storyCtaBtn");
 
+      let allStoriesRaw = [];
       let storiesData = [];
       let currentStoryIdx = 0;
       let currentSlideIdx = 0;
       let slideTimer = null;
-      const SLIDE_DURATION = 5000;
 
-      function getSeenSet() {
+      function getSeenMap() {
         try {
-          return new Set(JSON.parse(localStorage.getItem("ldorava_seen_stories") || "[]"));
+          const parsed = JSON.parse(localStorage.getItem(SEEN_STORAGE_KEY) || "{}");
+          return (parsed && typeof parsed === "object" && !Array.isArray(parsed)) ? parsed : {};
         } catch {
-          return new Set();
+          return {};
         }
       }
 
-      function markSeen(id) {
-        const seen = getSeenSet();
-        seen.add(id);
-        localStorage.setItem("ldorava_seen_stories", JSON.stringify([...seen]));
-        renderStoriesBar();
+      function saveSeenMap(map) {
+        try {
+          localStorage.setItem(SEEN_STORAGE_KEY, JSON.stringify(map));
+        } catch {}
+      }
+
+      function isExpiredAfterView(storyId, now = Date.now()) {
+        const seenMap = getSeenMap();
+        const firstSeenAt = seenMap[storyId];
+        if (!firstSeenAt) return false;
+        return (now - Number(firstSeenAt)) >= EXPIRE_AFTER_MS;
+      }
+
+      function markSeenNow(storyId) {
+        if (!storyId) return;
+        const seenMap = getSeenMap();
+        if (!seenMap[storyId]) {
+          seenMap[storyId] = Date.now();
+          saveSeenMap(seenMap);
+        }
+      }
+
+      function refreshActiveStories(rerenderBar = true) {
+        const now = Date.now();
+        storiesData = (allStoriesRaw || []).filter(st => st && !isExpiredAfterView(st.id, now));
+        if (rerenderBar) {
+          renderStoriesBar();
+        }
       }
 
       function renderStoriesBar() {
-        if (!storiesData.length || !bar) return;
-        const seen = getSeenSet();
+        if (!bar) return;
+        if (!storiesData.length) {
+          bar.style.display = "none";
+          bar.innerHTML = "";
+          return;
+        }
+
+        const seenMap = getSeenMap();
         bar.style.display = "flex";
-        bar.innerHTML = storiesData.map((st, idx) => `
-          <div class="story-item" data-idx="${idx}">
-            <div class="story-ring ${seen.has(st.id) ? "seen" : ""}">
-              <img src="${st.cover}" alt="${st.title}" loading="lazy">
+        bar.innerHTML = storiesData.map((st, idx) => {
+          const wasSeen = Boolean(seenMap[st.id]);
+          return `
+            <div class="story-item" data-idx="${idx}">
+              <div class="story-ring ${wasSeen ? "seen" : ""}">
+                <img src="${st.cover || "icon-512.png"}" alt="${st.title || ""}" loading="lazy">
+              </div>
+              <span class="story-title">${st.title || ""}</span>
             </div>
-            <span class="story-title">${st.title}</span>
-          </div>
-        `).join("");
+          `;
+        }).join("");
 
         bar.querySelectorAll(".story-item").forEach(el => {
           el.onclick = () => openStory(parseInt(el.dataset.idx, 10));
@@ -587,6 +625,8 @@
       }
 
       function openStory(storyIdx) {
+        refreshActiveStories(false);
+        if (!storiesData[storyIdx]) return;
         currentStoryIdx = storyIdx;
         currentSlideIdx = 0;
         viewer.style.display = "flex";
@@ -600,6 +640,7 @@
           videoEl.currentTime = 0;
         }
         viewer.style.display = "none";
+        refreshActiveStories(true);
       }
 
       function showSlide() {
@@ -609,7 +650,8 @@
           return closeStory();
         }
 
-        markSeen(story.id);
+        markSeenNow(story.id);
+
         const slide = story.slides[currentSlideIdx];
         titleEl.textContent = story.title || "";
         captionEl.textContent = slide.caption || "";
@@ -696,9 +738,9 @@
       fetch(STORIES_URL + "?v=" + Date.now())
         .then(r => r.ok ? r.json() : [])
         .then(data => {
-          if (Array.isArray(data) && data.length) {
-            storiesData = data;
-            renderStoriesBar();
+          if (Array.isArray(data)) {
+            allStoriesRaw = data;
+            refreshActiveStories(true);
           }
         })
         .catch(() => {});
