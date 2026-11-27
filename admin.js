@@ -1,4 +1,3 @@
-(() => {
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt = n => Number(n || 0).toLocaleString('en-US');
@@ -1105,7 +1104,7 @@ function editProduct(id) {
         if (val !== null) chk.checked = val > 0;
       }
     });
-})();
+
     md.querySelector('#esave').onclick = () => {
       sync();
       if (!p.name.trim()) { toast('اكتبي اسم المنتج'); return; }
