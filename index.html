@@ -644,6 +644,7 @@
     const chatSend = document.getElementById("ldorava-chat-send");
     const storyViewerEl = document.getElementById("storyViewer");
     const gridEl = document.getElementById("grid");
+    const navEl = document.getElementById("nav");
 
     let chatHistory = [];
     let guidedStarted = false;
@@ -654,8 +655,8 @@
       "الشامبو": {
         directShow: false,
         askHairType: true,
-        requiredKeys: ["شامبو", "شامبوهات", "شعر", "بلسم", "ماسك", "كيراتين"],
-        excludeKeys: ["تونر", "الوجه", "للبشره", "بشره", "غسول وجه", "كريم وجه", "مكياج", "روج", "عطر"],
+        requiredKeys: ["شامبو", "شامبوهات", "شعر", "بلسم", "ماسك", "كيراتين", "ارغان", "أرغان"],
+        excludeKeys: ["تونر", "الوجه", "للبشره", "غسول وجه", "كريم وجه", "مكياج", "روج", "عطر"],
         question: "شنو نوع شعرج أو المشكلة حتى أختار لج الشامبو والنوع المناسب؟",
         choices: [
           { label: "شعر جاف وتالف", keys: ["جاف", "جافه", "تالف", "ترطيب", "كيراتين", "ارغان", "أرغان"] },
@@ -668,15 +669,28 @@
       "العطور": {
         directShow: true,
         askHairType: false,
-        requiredKeys: ["عطر", "عطور", "برفيوم", "سبلاش", "معطر", "فواح", "او دي"],
+        requiredKeys: ["عطر", "عطور", "برفيوم", "سبلاش", "معطر", "فواح", "او دي", "perfume", "mist", "body"],
         excludeKeys: ["تونر", "شامبو", "ماسكارا", "روج"],
+        question: "",
+        choices: []
+      },
+      "المكياج": {
+        directShow: true,
+        askHairType: false,
+        requiredKeys: [
+          "مكياج", "ميك اب", "تجميل", "اساس", "أساس", "كريم اساس",
+          "روج", "حمرة", "حمره", "شفاه", "قلوس", "تنت", "بلاشر",
+          "ماسكارا", "كحل", "ايلاينر", "ظلال", "باودر", "كونسيلر", "حواجب",
+          "makeup", "lip", "tint", "gloss", "blush", "mascara", "foundation"
+        ],
+        excludeKeys: ["شامبو", "تونر", "عطر"],
         question: "",
         choices: []
       },
       "العناية بالبشرة": {
         directShow: false,
         askHairType: false,
-        requiredKeys: ["بشره", "غسول", "كريم", "سيروم", "مرطب", "واقي", "تونر", "الوجه"],
+        requiredKeys: ["بشره", "غسول", "كريم", "سيروم", "مرطب", "واقي", "تونر", "الوجه", "سكين"],
         excludeKeys: ["شامبو", "شعر", "روج", "ماسكارا"],
         question: "شنو أكثر شي تحتاجينه لبشرتج حالياً؟",
         choices: [
@@ -684,14 +698,6 @@
           { label: "تفتيح ونضارة", keys: ["تفتيح", "نضاره", "فيتامين", "كولاجين", "رمان"] },
           { label: "بشرة دهنية / حبوب", keys: ["دهنيه", "حبوب", "مسام", "غسول"] }
         ]
-      },
-      "المكياج": {
-        directShow: true,
-        askHairType: false,
-        requiredKeys: ["مكياج", "اساس", "روج", "حمره", "ماسكارا", "باودر", "كونسيلر"],
-        excludeKeys: ["شامبو", "تونر", "عطر"],
-        question: "",
-        choices: []
       }
     };
 
@@ -728,7 +734,7 @@
               price: p.price ? `${Number(p.price).toLocaleString("en-US")} د.ع` : "",
               img: p.image || p.img || (Array.isArray(p.images) ? p.images[0] : "") || "",
               variants: varNames,
-              extraText: normalizeAr(`${p.category || ""} ${p.desc || ""} ${p.description || ""} ${p.specs || ""} ${p.usage || ""} ${varNames.join(" ")}`)
+              extraText: normalizeAr(`${p.category || ""} ${p.cat || ""} ${p.section || ""} ${p.desc || ""} ${p.description || ""} ${p.specs || ""} ${p.usage || ""} ${varNames.join(" ")}`)
             };
           });
         })
@@ -770,9 +776,12 @@
           ? parsedRawVars
           : (matchedStore?.variants?.length ? matchedStore.variants : domVars);
 
+        const cardCat = card.getAttribute("data-cat") || card.getAttribute("data-category") || "";
         const extraInfo = [
+          cardCat,
           matchedStore?.extraText || "",
           rawObj?.category || "",
+          rawObj?.cat || "",
           rawObj?.desc || rawObj?.description || "",
           rawObj?.specs || "",
           rawObj?.usage || ""
@@ -806,6 +815,14 @@
       }
 
       return [];
+    }
+
+    function getNavCategoryNames() {
+      if (!navEl) return [];
+      return Array.from(navEl.querySelectorAll("button, a, .cat, .tab, span"))
+        .map(el => (el.textContent || "").trim())
+        .filter(t => t && t.length <= 30 && !/الكل|all|الرئيسيه|الرئيسية/i.test(normalizeAr(t)))
+        .filter((v, i, arr) => arr.indexOf(v) === i);
     }
 
     function appendQuickChips(labels, onSelect) {
@@ -921,17 +938,15 @@
       } = opts || {};
 
       const all = getStoreProductsList();
-      const nReq = requiredKeys.map(normalizeAr);
-      const nExcl = excludeKeys.map(normalizeAr);
-      const nTrait = traitKeys.map(normalizeAr);
+      const nReq = requiredKeys.map(normalizeAr).filter(Boolean);
+      const nExcl = excludeKeys.map(normalizeAr).filter(Boolean);
+      const nTrait = traitKeys.map(normalizeAr).filter(Boolean);
       const nQuery = normalizeAr(freeQuery);
 
       let matches = all.map(prod => {
-        // يجب أن يحتوي المنتج على كلمة أساسية من القسم المطلوب (مثلاً شامبو/شعر)
         const reqMatched = !nReq.length || nReq.some(k => prod.text.includes(k));
         if (!reqMatched) return null;
 
-        // استبعاد المنتجات التي اسمها أو وصفها يطابق كلمات مستبعدة بوضوح (مثل تونر الوجه لمسار الشامبو)
         const isExcludedByName = nExcl.some(ex => prod.nameNorm.includes(ex));
         if (isExcludedByName) return null;
 
@@ -993,7 +1008,7 @@
       }
 
       guidedState = { step: "start", category: null };
-      appendQuickChips(["سؤال جديد", "الشامبو", "العطور"], (nextChoice) => {
+      appendQuickChips(["سؤال جديد", "الشامبو", "العطور", "المكياج"], (nextChoice) => {
         if (nextChoice === "سؤال جديد") {
           startGuidedFlow();
         } else {
@@ -1005,40 +1020,51 @@
 
     function handleGuidedCategory(catName) {
       const flow = guidedFlows[catName];
-      if (!flow) {
-        startGuidedFlow();
-        return;
-      }
       appendChatMessage(catName, "user");
 
-      if (flow.directShow) {
-        showAssistantSelection({
-          requiredKeys: flow.requiredKeys,
-          excludeKeys: flow.excludeKeys || [],
-          emptyMessage: `ما متوفرة حالياً منتجات في قسم "${catName}".`
+      const navCats = getNavCategoryNames();
+      const matchedNavCat = navCats.find(c => {
+        const nc = normalizeAr(c);
+        const nCat = normalizeAr(catName);
+        return nc.includes(nCat) || nCat.includes(nc);
+      });
+
+      const keysToUse = Array.from(new Set([
+        ...(flow?.requiredKeys || []),
+        catName,
+        matchedNavCat || ""
+      ].filter(Boolean)));
+
+      if (flow && !flow.directShow && Array.isArray(flow.choices) && flow.choices.length) {
+        guidedState = { step: "sub", category: catName };
+        appendChatMessage(flow.question, "bot");
+        appendQuickChips(flow.choices.map(c => c.label), (subLabel) => {
+          appendChatMessage(subLabel, "user");
+          const picked = flow.choices.find(c => c.label === subLabel);
+          showAssistantSelection({
+            requiredKeys: keysToUse,
+            excludeKeys: flow.excludeKeys || [],
+            traitKeys: picked ? picked.keys : [],
+            autoPickSingle: Boolean(flow.askHairType),
+            emptyMessage: "ما متوفر شامبو مطابق لهذا النوع حالياً."
+          });
         });
         return;
       }
 
-      guidedState = { step: "sub", category: catName };
-      appendChatMessage(flow.question, "bot");
-      appendQuickChips(flow.choices.map(c => c.label), (subLabel) => {
-        appendChatMessage(subLabel, "user");
-        const picked = flow.choices.find(c => c.label === subLabel);
-        showAssistantSelection({
-          requiredKeys: flow.requiredKeys,
-          excludeKeys: flow.excludeKeys || [],
-          traitKeys: picked ? picked.keys : [],
-          autoPickSingle: Boolean(flow.askHairType),
-          emptyMessage: "ما متوفر شامبو مطابق لهذا النوع حالياً."
-        });
+      showAssistantSelection({
+        requiredKeys: keysToUse,
+        excludeKeys: flow?.excludeKeys || [],
+        emptyMessage: `ما متوفرة حالياً منتجات مطابقة لقسم "${catName}".`
       });
     }
 
     function startGuidedFlow() {
       guidedState = { step: "cat", category: null };
       appendChatMessage("شنو تحتاجين هسه؟", "bot");
-      appendQuickChips(Object.keys(guidedFlows), (cat) => handleGuidedCategory(cat));
+      const baseCats = Object.keys(guidedFlows);
+      const navCats = getNavCategoryNames().filter(c => !baseCats.some(b => normalizeAr(b) === normalizeAr(c)));
+      appendQuickChips(baseCats.concat(navCats.slice(0, 3)), (cat) => handleGuidedCategory(cat));
     }
 
     function isHomeScreenActive() {
