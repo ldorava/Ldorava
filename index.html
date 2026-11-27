@@ -661,7 +661,7 @@
 
   <script src="app.js"></script>
   <script src="admin.js"></script>
-  <script>
+<script>
     (function () {
       const chatBtn = document.getElementById("ldorava-chat-btn");
       const chatBox = document.getElementById("ldorava-chat-box");
@@ -670,6 +670,12 @@
       const chatInput = document.getElementById("ldorava-chat-input");
       const chatMessages = document.getElementById("ldorava-chat-messages");
       const scrollTopBtn = document.getElementById("scrollTopBtn");
+      const storiesBar = document.getElementById("storiesBar");
+
+      // إظهار شريط الستوري إذا كان مخفياً بعد تحميل الصفحة
+      if (storiesBar && storiesBar.children.length > 0) {
+        storiesBar.style.display = "flex";
+      }
 
       if (chatBtn && chatBox) {
         chatBtn.addEventListener("click", () => {
@@ -727,7 +733,7 @@
         {
           key: "category",
           question: "ما هو المجال الذي تبحثين فيه حالياً؟",
-          options: ["البشرة", "الشعر", "المكياج", "العناية"]
+          options: ["البشرة", "الشعر", "المكياج", "العناية", "عطور"]
         },
         {
           key: "goal",
@@ -745,24 +751,71 @@
       let quizAnswers = {};
       let compareItems = [];
 
-      function getCatalogProducts() {
-        if (Array.isArray(window.PRODUCTS) && window.PRODUCTS.length) return window.PRODUCTS;
-        if (Array.isArray(window.products) && window.products.length) return window.products;
-        return [];
+      // قراءة المنتجات مباشرة من بطاقات #grid الموجودة في الصفحة
+      function extractProductsFromDOM() {
+        if (!gridEl) return [];
+        const cards = Array.from(gridEl.children).filter(el =>
+          !el.classList.contains("ld-empty-state")
+        );
+
+        return cards.map((card, index) => {
+          const id = card.getAttribute("data-id") || card.getAttribute("data-product-id") || `dom-prod-${index}`;
+          const imgEl = card.querySelector("img");
+          const imgSrc = imgEl ? (imgEl.getAttribute("src") || "") : "";
+
+          // محاولة استخراج العنوان والسعر من النصوص داخل الكرت
+          const headingEl = card.querySelector("h2, h3, h4, .title, .name, .prod-title");
+          let name = headingEl ? headingEl.textContent.trim() : "";
+
+          const fullText = card.innerText || card.textContent || "";
+          const lines = fullText
+            .split("\n")
+            .map(s => s.trim())
+            .filter(s => s && !s.includes("⚖️") && !s.includes("قارن") && !s.includes("أضف") && !s.includes("أضيفي"));
+
+          if (!name && lines.length) {
+            name = lines[0];
+          }
+
+          // البحث عن سطر يحتوي على رقم أو عملة للسعر
+          const priceLine = lines.find(l => /(\d[\d,\.]*)\s*(د\.ع|IQD|دينار|\$|ر\.س)?/i.test(l) && /\d/.test(l)) || "";
+          const descText = lines.filter(l => l !== name && l !== priceLine).join(" · ");
+
+          // زر الإضافة للسلة داخل الكرت
+          const addBtnInCard = Array.from(card.querySelectorAll("button")).find(b =>
+            !b.classList.contains("ld-compare-btn") && /سلة|أضف|أضيفي|اطلب/i.test(b.textContent || "")
+          );
+
+          return {
+            id,
+            name: name || `منتج ${index + 1}`,
+            priceText: priceLine,
+            desc: descText,
+            img: imgSrc,
+            rawText: fullText,
+            cardEl: card,
+            addBtnEl: addBtnInCard || null
+          };
+        });
       }
 
-      function addProductToCart(productId) {
-        const list = getCatalogProducts();
-        const prod = list.find(p => String(p.id) === String(productId));
-        if (typeof window.addToCart === "function") {
-          window.addToCart(prod || productId);
-        } else if (typeof window.addItemToCart === "function") {
-          window.addItemToCart(prod || productId);
-        } else {
-          alert("تمت إضافة المنتج للسلة (تأكدي من ربط دالة السلة في app.js).");
+      window.ldAddByIndex = function (idx) {
+        const list = extractProductsFromDOM();
+        const item = list[idx];
+        if (!item) return;
+
+        if (item.addBtnEl) {
+          closeGuideModal();
+          item.addBtnEl.click();
+          return;
         }
-      }
-      window.ldAddToCart = addProductToCart;
+        if (typeof window.addToCart === "function") {
+          closeGuideModal();
+          window.addToCart(item.id);
+        } else {
+          alert(`تم اختيار: ${item.name}`);
+        }
+      };
 
       function openGuideModal() {
         if (guideModal) guideModal.classList.add("open");
@@ -805,37 +858,49 @@
 
       function renderQuizResults() {
         if (!guideBody) return;
-        const catalog = getCatalogProducts();
-        const catKeyword = (quizAnswers.category || "").trim();
-        const goalKeyword = (quizAnswers.goal || "").trim();
+        const catalog = extractProductsFromDOM();
+        const cat = (quizAnswers.category || "").trim();
+        const goal = (quizAnswers.goal || "").trim();
 
-        let matches = catalog.filter(p => {
-          const text = `${p.name || ""} ${p.category || ""} ${p.desc || ""} ${p.description || ""}`;
-          return (!catKeyword || text.includes(catKeyword)) || (!goalKeyword || text.includes(goalKeyword));
+        // مطابقة ذكية حسب القسم أو الهدف، وإذا لم يجد تطابقاً حرفياً يعرض أفضل منتجات المتجر
+        let scored = catalog.map((item, idx) => {
+          let score = 0;
+          if (cat && item.rawText.includes(cat)) score += 3;
+          if (goal && item.rawText.includes(goal)) score += 2;
+          return { item, idx, score };
         });
-        if (!matches.length) matches = catalog.slice(0, 3);
-        matches = matches.slice(0, 3);
+
+        scored.sort((a, b) => b.score - a.score);
+        let topMatches = scored.filter(s => s.score > 0).slice(0, 3);
+        if (!topMatches.length) {
+          topMatches = scored.slice(0, 3);
+        }
 
         guideBody.innerHTML = `
           <h3 style="margin:0 0 6px;color:#d6336c;">✨ المنتجات الأنسب لاختياركِ</h3>
           <p style="margin:0 0 12px;font-size:13px;color:#6b7280;">
             القسم: <b>${quizAnswers.category || "-"}</b> · الهدف: <b>${quizAnswers.goal || "-"}</b> · الاستخدام: <b>${quizAnswers.preference || "-"}</b>
           </p>
-          ${matches.length ? matches.map(item => `
+          ${topMatches.length ? topMatches.map(({ item, idx }) => `
             <div class="ld-result-row">
-              <div>
-                <div style="font-weight:bold;font-size:14px;">${item.name || "منتج L'DORA"}</div>
-                <div style="font-size:12.5px;color:#d6336c;font-weight:600;">${item.price ? item.price + " د.ع" : ""}</div>
+              <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+                ${item.img ? `<img src="${item.img}" alt="" style="width:46px;height:46px;object-fit:cover;border-radius:8px;flex-shrink:0;">` : ""}
+                <div style="min-width:0;">
+                  <div style="font-weight:bold;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.name}</div>
+                  ${item.priceText ? `<div style="font-size:12.5px;color:#d6336c;font-weight:600;">${item.priceText}</div>` : ""}
+                </div>
               </div>
-              <button type="button" class="ld-pill-btn" onclick="window.ldAddToCart('${item.id}')">أضيفي للسلة</button>
+              <button type="button" class="ld-pill-btn" onclick="window.ldAddByIndex(${idx})">أضيفي للسلة</button>
             </div>
           `).join("") : `
-            <p style="font-size:13.5px;color:#4b5563;">تصفحي قائمة المنتجات في المتجر لاختيار المنتج المناسب من قسم ${catKeyword || "العناية"}.</p>
+            <p style="font-size:13.5px;color:#4b5563;">تصفحي قائمة المنتجات في المتجر لاختيار المنتج المناسب.</p>
           `}
-          <div style="margin-top:14px;text-align:left;">
+          <div style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;">
             <button type="button" class="ld-quiz-opt" id="ldRestartQuiz" style="padding:8px 14px;">إعادة الاختبار</button>
+            <button type="button" class="ld-pill-btn" id="ldCloseQuizDone">تصفح المتجر</button>
           </div>
         `;
+
         const restartBtn = document.getElementById("ldRestartQuiz");
         if (restartBtn) {
           restartBtn.addEventListener("click", () => {
@@ -843,6 +908,10 @@
             quizAnswers = {};
             renderQuizStep();
           });
+        }
+        const doneBtn = document.getElementById("ldCloseQuizDone");
+        if (doneBtn) {
+          doneBtn.addEventListener("click", closeGuideModal);
         }
       }
 
@@ -856,7 +925,7 @@
       }
 
       function syncCompareButtons() {
-        const activeIds = new Set(compareItems.map(i => String(i.id)));
+        const activeIds = new Set(compareItems.map(i => i.id));
         document.querySelectorAll(".ld-compare-btn").forEach(btn => {
           const id = btn.getAttribute("data-pid");
           btn.classList.toggle("active", activeIds.has(id));
@@ -875,48 +944,51 @@
         syncCompareButtons();
       }
 
-      function toggleCompareProduct(product) {
-        if (!product || !product.id) return;
-        const idx = compareItems.findIndex(item => String(item.id) === String(product.id));
-        if (idx > -1) {
-          compareItems.splice(idx, 1);
+      function toggleCompareByIndex(idx) {
+        const list = extractProductsFromDOM();
+        const product = list[idx];
+        if (!product) return;
+
+        const existsIdx = compareItems.findIndex(item => item.id === product.id);
+        if (existsIdx > -1) {
+          compareItems.splice(existsIdx, 1);
         } else {
           if (compareItems.length >= 3) {
             alert("يمكنكِ مقارنة 3 منتجات كحد أقصى في الوقت نفسه.");
             return;
           }
-          compareItems.push(product);
+          compareItems.push({ ...product, domIndex: idx });
         }
         updateCompareBar();
       }
 
       function injectCompareButtons() {
-        const catalog = getCatalogProducts();
-        if (!gridEl || !catalog.length) return;
-        const cards = gridEl.children;
-        for (let i = 0; i < cards.length; i++) {
-          const card = cards[i];
-          if (card.querySelector(".ld-compare-btn")) continue;
-          const prod = catalog[i];
-          if (!prod) continue;
+        const items = extractProductsFromDOM();
+        if (!items.length) return;
+
+        items.forEach((prod, idx) => {
+          if (!prod.cardEl || prod.cardEl.querySelector(".ld-compare-btn")) return;
           const btn = document.createElement("button");
           btn.type = "button";
           btn.className = "ld-compare-btn";
-          btn.setAttribute("data-pid", String(prod.id));
+          btn.setAttribute("data-pid", prod.id);
           btn.textContent = "⚖️ قارن";
           btn.addEventListener("click", (e) => {
             e.stopPropagation();
-            toggleCompareProduct(prod);
+            toggleCompareByIndex(idx);
           });
-          card.appendChild(btn);
-        }
+          prod.cardEl.appendChild(btn);
+        });
         syncCompareButtons();
       }
 
       if (gridEl) {
-        const observer = new MutationObserver(() => injectCompareButtons());
+        const observer = new MutationObserver(() => {
+          setTimeout(injectCompareButtons, 50);
+        });
         observer.observe(gridEl, { childList: true, subtree: true });
-        setTimeout(injectCompareButtons, 400);
+        setTimeout(injectCompareButtons, 300);
+        setTimeout(injectCompareButtons, 1200);
       }
 
       if (clearCompareBtn) {
@@ -940,25 +1012,25 @@
                 <thead>
                   <tr>
                     <th>البند</th>
-                    ${compareItems.map(p => `<th>${p.name || "منتج"}</th>`).join("")}
+                    ${compareItems.map(p => `<th>${p.name}</th>`).join("")}
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
+                    <td><b>الصورة</b></td>
+                    ${compareItems.map(p => `<td>${p.img ? `<img src="${p.img}" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:8px;">` : "-"}</td>`).join("")}
+                  </tr>
+                  <tr>
                     <td><b>السعر</b></td>
-                    ${compareItems.map(p => `<td>${p.price ? p.price + " د.ع" : "-"}</td>`).join("")}
+                    ${compareItems.map(p => `<td>${p.priceText || "-"}</td>`).join("")}
                   </tr>
                   <tr>
-                    <td><b>الفئة</b></td>
-                    ${compareItems.map(p => `<td>${p.category || "-"}</td>`).join("")}
-                  </tr>
-                  <tr>
-                    <td><b>الوصف</b></td>
-                    ${compareItems.map(p => `<td>${p.desc || p.description || "منتج أصلي من L'DORA"}</td>`).join("")}
+                    <td><b>التفاصيل</b></td>
+                    ${compareItems.map(p => `<td>${p.desc || "منتج أصلي من L'DORA"}</td>`).join("")}
                   </tr>
                   <tr>
                     <td><b>الطلب</b></td>
-                    ${compareItems.map(p => `<td><button type="button" class="ld-pill-btn" onclick="window.ldAddToCart('${p.id}')">أضيفي للسلة</button></td>`).join("")}
+                    ${compareItems.map(p => `<td><button type="button" class="ld-pill-btn" onclick="window.ldAddByIndex(${p.domIndex})">أضيفي للسلة</button></td>`).join("")}
                   </tr>
                 </tbody>
               </table>
