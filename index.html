@@ -374,16 +374,10 @@
       border-radius: 12px;
       padding: 8px 10px;
       display: flex;
-      flex-direction: column;
-      gap: 7px;
-      box-shadow: 0 3px 10px rgba(214, 51, 108, 0.08);
-    }
-
-    .ld-ai-prod-top {
-      display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
+      box-shadow: 0 3px 10px rgba(214, 51, 108, 0.08);
     }
 
     .ld-ai-prod-info {
@@ -422,31 +416,6 @@
       font-weight: bold;
       cursor: pointer;
       flex-shrink: 0;
-    }
-
-    .ld-ai-var-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 5px;
-    }
-
-    .ld-ai-var-chip {
-      background: #fdf2f8;
-      color: #831843;
-      border: 1px solid #f9a8d4;
-      border-radius: 8px;
-      padding: 4px 8px;
-      font-family: inherit;
-      font-size: 11px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .ld-ai-var-chip.active,
-    .ld-ai-var-chip:hover {
-      background: #d6336c;
-      color: #ffffff;
-      border-color: #d6336c;
     }
 
     #ldorava-chat-form {
@@ -567,7 +536,7 @@
       <button id="ldorava-chat-close" type="button" aria-label="إغلاق">×</button>
     </div>
     <div id="ldorava-chat-messages">
-      <div class="ld-msg bot">أهلاً بك في L'DORA Viva! راح أسألج أسئلة سريعة وأطلع لج المنتج والخيار المناسب، أو اسأليني مباشرة.</div>
+      <div class="ld-msg bot">أهلاً بك في L'DORA Viva! راح أسألج سؤال سريع وأطلع لج المنتج المناسب مباشرة.</div>
     </div>
     <form id="ldorava-chat-form">
       <input id="ldorava-chat-input" type="text" placeholder="اكتب سؤالك هنا..." autocomplete="off" />
@@ -680,46 +649,47 @@
     let guidedStarted = false;
     let guidedState = { step: "start", category: null };
 
+    // إعدادات الأقسام:
+    // directShow: true -> يعرض المنتجات الموجودة فوراً بدون جعله يختار من قائمة خيارات طويلة
+    // askHairType: true -> يسأل نوع الشعر ويختار له المساعد الشامبو الأنسب تلقائياً
     const guidedFlows = {
       "الشامبو": {
-        keywords: ["شامبو", "شعر", "بلسم", "ماسك", "كيراتين"],
-        question: "اختاري نوع الشعر أو المشكلة حتى أرشّح لج الشامبو والخيار المناسب:",
+        directShow: false,
+        askHairType: true,
+        requiredKeys: ["شامبو", "شعر", "بلسم", "ماسك", "كيراتين"],
+        question: "شنو نوع شعرج أو المشكلة حتى أختار لج الشامبو المناسب؟",
         choices: [
           { label: "شعر جاف وتالف", keys: ["جاف", "جافه", "تالف", "ترطيب", "كيراتين", "ارغان", "أرغان"] },
           { label: "شعر دهني", keys: ["دهني", "دهنيه", "توازن", "منقي", "نعناع", "ليمون"] },
           { label: "تساقط وتقوية", keys: ["تساقط", "تقوية", "تقويه", "كافيين", "مقوي"] },
           { label: "ضد القشرة", keys: ["قشرة", "قشره", "فروة", "فروه"] },
-          { label: "شعر مصبوغ", keys: ["مصبوغ", "مصبوغه", "ملون", "حماية اللون"] },
-          { label: "استخدام يومي / عادي", keys: ["عادي", "عائلي", "يومي", "ناعم", "لجميع"] }
+          { label: "شعر مصبوغ", keys: ["مصبوغ", "مصبوغه", "ملون", "حماية اللون"] }
         ]
       },
+      "العطور": {
+        directShow: true,
+        askHairType: false,
+        requiredKeys: ["عطر", "عطور", "برفيوم", "سبلاش", "معطر", "فواح", "او دي"],
+        question: "",
+        choices: []
+      },
       "العناية بالبشرة": {
-        keywords: ["بشرة", "بشره", "غسول", "كريم", "سيروم", "مرطب", "واقي", "تونر"],
-        question: "شنو أكثر شي تحتاجينه لبشرتكِ حالياً؟",
+        directShow: false,
+        askHairType: false,
+        requiredKeys: ["بشرة", "بشره", "غسول", "كريم", "سيروم", "مرطب", "واقي", "تونر"],
+        question: "شنو أكثر شي تحتاجينه لبشرتج حالياً؟",
         choices: [
           { label: "ترطيب عميق", keys: ["ترطيب", "جافة", "جافه", "مرطب", "هيالورونيك"] },
           { label: "تفتيح ونضارة", keys: ["تفتيح", "نضارة", "نضاره", "فيتامين", "كولاجين"] },
-          { label: "بشرة دهنية / حبوب", keys: ["دهنية", "دهنيه", "حبوب", "مسام", "غسول"] },
-          { label: "حماية من الشمس", keys: ["شمس", "واقي", "spf"] }
+          { label: "بشرة دهنية / حبوب", keys: ["دهنية", "دهنيه", "حبوب", "مسام", "غسول"] }
         ]
       },
       "المكياج": {
-        keywords: ["مكياج", "اساس", "أساس", "روج", "حمرة", "حمره", "ماسكارا", "باودر", "كونسيلر"],
-        question: "أي نوع من المكياج تدورين عليه؟",
-        choices: [
-          { label: "أساس وتغطية", keys: ["اساس", "أساس", "باودر", "كونسيلر", "بي بي"] },
-          { label: "شفاه", keys: ["روج", "حمرة", "حمره", "شفاه", "قلوس"] },
-          { label: "عيون", keys: ["ماسكارا", "كحل", "عيون", "رموش"] }
-        ]
-      },
-      "العطور والجسم": {
-        keywords: ["عطر", "جسم", "لوشن", "سبلاش", "معطر", "مزيل"],
-        question: "شنو تفضلين من قسم العطور والجسم؟",
-        choices: [
-          { label: "عطور ثابتة", keys: ["عطر", "او دي", "فواح", "ثابت"] },
-          { label: "ترطيب الجسم", keys: ["لوشن", "جسم", "مرطب", "زبدة"] },
-          { label: "انتعاش يومي", keys: ["سبلاش", "مزيل", "انتعاش", "معطر"] }
-        ]
+        directShow: true,
+        askHairType: false,
+        requiredKeys: ["مكياج", "اساس", "أساس", "روج", "حمرة", "حمره", "ماسكارا", "باودر", "كونسيلر"],
+        question: "",
+        choices: []
       }
     };
 
@@ -826,7 +796,7 @@
         "button, .variant, .var-item, .opt, label, [data-variant], [data-option], [data-value]"
       ));
 
-      const exactOrPartial = candidates.find(el => {
+      const match = candidates.find(el => {
         const rawVal = (
           el.getAttribute("data-variant") ||
           el.getAttribute("data-option") ||
@@ -840,9 +810,9 @@
         return normVal.includes(targetKey) || targetKey.includes(normVal);
       });
 
-      if (exactOrPartial) {
-        exactOrPartial.click();
-        exactOrPartial.dispatchEvent(new Event("change", { bubbles: true }));
+      if (match) {
+        match.click();
+        match.dispatchEvent(new Event("change", { bubbles: true }));
         return true;
       }
 
@@ -862,140 +832,110 @@
       return false;
     }
 
-    function openProductWithSelectedVariant(prod, chosenVariant) {
+    function openProductCard(prod, bestVariant) {
       chatBox.style.display = "none";
       syncAssistantVisibility();
-
       if (prod.cardEl) {
         prod.cardEl.click();
-        if (chosenVariant) {
-          setTimeout(() => selectVariantInsideModal(document.getElementById("pmodal"), chosenVariant), 120);
-          setTimeout(() => selectVariantInsideModal(document.getElementById("pmodal"), chosenVariant), 320);
-          setTimeout(() => selectVariantInsideModal(document.getElementById("pmodal"), chosenVariant), 600);
+        if (bestVariant) {
+          setTimeout(() => selectVariantInsideModal(document.getElementById("pmodal"), bestVariant), 140);
+          setTimeout(() => selectVariantInsideModal(document.getElementById("pmodal"), bestVariant), 360);
         }
       } else {
-        addProductIdToStoreCart(prod.id, "", chosenVariant || "");
+        addProductIdToStoreCart(prod.id, "", bestVariant || "");
       }
     }
 
-    function renderMatchedProducts(catKeys, subKeys, freeQuery, isShampooFlow = false) {
+    // يختار المساعد المنتج الأنسب تلقائياً ويعرض فقط المنتجات الموجودة فعلاً
+    function showAssistantSelection(opts) {
+      const {
+        requiredKeys = [],
+        traitKeys = [],
+        freeQuery = "",
+        autoPickSingle = false,
+        emptyMessage = "ما متوفر حالياً بهذا العنوان بالمتجر."
+      } = opts || {};
+
       const all = getStoreProductsList();
-      const nCat = (catKeys || []).map(normalizeAr);
-      const nSub = (subKeys || []).map(normalizeAr);
-      const nQuery = normalizeAr(freeQuery || "");
+      const nReq = requiredKeys.map(normalizeAr);
+      const nTrait = traitKeys.map(normalizeAr);
+      const nQuery = normalizeAr(freeQuery);
 
-      let scored = all.map(prod => {
-        let score = 0;
-        let matchedVariant = "";
+      let matches = all.map(prod => {
+        const reqMatched = !nReq.length || nReq.some(k => prod.text.includes(k));
+        if (!reqMatched) return null;
 
-        const hasCatMatch = nCat.some(k => prod.text.includes(k));
-        if (hasCatMatch) score += 3;
+        let score = 1;
+        let bestVariant = "";
 
-        if (isShampooFlow && !hasCatMatch && nCat.length) {
-          score -= 5;
-        }
-
-        nSub.forEach(k => {
-          if (prod.text.includes(k)) score += 4;
+        nTrait.forEach(k => {
+          if (prod.text.includes(k)) score += 5;
           const vHit = prod.variants.find(v => {
             const nv = normalizeAr(v);
             return nv.includes(k) || k.includes(nv);
           });
-          if (vHit && !matchedVariant) {
-            matchedVariant = vHit;
-            score += 4;
+          if (vHit) {
+            bestVariant = vHit;
+            score += 6;
           }
         });
 
-        if (!matchedVariant && prod.variants.length) {
-          matchedVariant = prod.variants[0];
-        }
-
         if (nQuery) {
-          nQuery.split(/\s+/).filter(w => w.length > 1).forEach(word => {
-            if (prod.text.includes(word)) score += 3;
-            const vWordHit = prod.variants.find(v => normalizeAr(v).includes(word));
-            if (vWordHit && !matchedVariant) {
-              matchedVariant = vWordHit;
-              score += 3;
-            }
-          });
+          const words = nQuery.split(/\s+/).filter(w => w.length > 1);
+          const qHits = words.filter(w => prod.text.includes(w));
+          if (!qHits.length) return null;
+          score += qHits.length * 4;
         }
 
-        return { prod, score, matchedVariant };
-      }).filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 3);
+        if (!bestVariant && prod.variants.length) {
+          bestVariant = prod.variants[0];
+        }
 
-      if (!scored.length && !nQuery && !isShampooFlow) {
-        scored = all.slice(0, 3).map(prod => ({
-          prod,
-          score: 0,
-          matchedVariant: prod.variants[0] || ""
-        }));
+        return { prod, score, bestVariant };
+      }).filter(Boolean).sort((a, b) => b.score - a.score);
+
+      // إذا اختار الشامبو ونوع الشعر، يختار المساعد الشامبو الأنسب له مباشرة
+      if (autoPickSingle && matches.length > 1) {
+        matches = [matches[0]];
+      } else {
+        matches = matches.slice(0, 4);
       }
 
-      if (scored.length) {
-        appendChatMessage(
-          isShampooFlow ? "هذا الشامبو الأنسب لاختياركِ:" : "هاي المنتجات الأنسب لاختياركِ:",
-          "bot"
-        );
-
-        scored.forEach(({ prod, matchedVariant }) => {
-          let activeVariant = matchedVariant || (prod.variants[0] || "");
-          const card = document.createElement("div");
-          card.className = "ld-ai-prod-card";
-
-          const variantsHtml = prod.variants.length
-            ? `<div class="ld-ai-var-list">
-                ${prod.variants.map(v => `
-                  <button type="button" class="ld-ai-var-chip ${v === activeVariant ? "active" : ""}" data-vname="${v.replace(/"/g, "&quot;")}">${v}</button>
-                `).join("")}
-              </div>`
-            : "";
-
-          card.innerHTML = `
-            <div class="ld-ai-prod-top">
-              ${prod.img ? `<img src="${prod.img}" alt="" style="width:42px;height:42px;object-fit:cover;border-radius:8px;flex-shrink:0;">` : ""}
-              <div class="ld-ai-prod-info">
-                <div class="ld-ai-prod-title">${prod.name}</div>
-                <div class="ld-ai-prod-sub">${activeVariant ? `الخيار المختار: ${activeVariant}` : "اخترِ المنتج"}</div>
-                ${prod.price ? `<div class="ld-ai-prod-price">${prod.price}</div>` : ""}
-              </div>
-              <button type="button" class="ld-ai-prod-btn">اختيار</button>
-            </div>
-            ${variantsHtml}
-          `;
-
-          const subLabelEl = card.querySelector(".ld-ai-prod-sub");
-          card.querySelectorAll(".ld-ai-var-chip").forEach(vBtn => {
-            vBtn.addEventListener("click", () => {
-              card.querySelectorAll(".ld-ai-var-chip").forEach(b => b.classList.remove("active"));
-              vBtn.classList.add("active");
-              activeVariant = vBtn.getAttribute("data-vname") || "";
-              if (subLabelEl && activeVariant) {
-                subLabelEl.textContent = `الخيار المختار: ${activeVariant}`;
-              }
-            });
-          });
-
-          card.querySelector(".ld-ai-prod-btn").addEventListener("click", () => {
-            openProductWithSelectedVariant(prod, activeVariant || (nSub[0] || ""));
-          });
-
-          chatMessages.appendChild(card);
-        });
+      if (!matches.length) {
+        appendChatMessage(emptyMessage, "bot");
       } else {
         appendChatMessage(
-          "ما لقيت مطابقة مباشرة لهذا الاختيار حالياً، جربي خياراً آخر أو اكتبي اسم المنتج المطلوب.",
+          autoPickSingle
+            ? "هذا الشامبو الأنسب لاختيارج:"
+            : "هاي المنتجات الموجودة حالياً:",
           "bot"
         );
+
+        matches.forEach(({ prod, bestVariant }) => {
+          const card = document.createElement("div");
+          card.className = "ld-ai-prod-card";
+          card.innerHTML = `
+            ${prod.img ? `<img src="${prod.img}" alt="" style="width:42px;height:42px;object-fit:cover;border-radius:8px;flex-shrink:0;">` : ""}
+            <div class="ld-ai-prod-info">
+              <div class="ld-ai-prod-title">${prod.name}</div>
+              ${bestVariant ? `<div class="ld-ai-prod-sub">الاختيار المناسب: ${bestVariant}</div>` : ""}
+              ${prod.price ? `<div class="ld-ai-prod-price">${prod.price}</div>` : ""}
+            </div>
+            <button type="button" class="ld-ai-prod-btn">اختيار</button>
+          `;
+          card.querySelector(".ld-ai-prod-btn").addEventListener("click", () => {
+            openProductCard(prod, bestVariant);
+          });
+          chatMessages.appendChild(card);
+        });
       }
 
       guidedState = { step: "start", category: null };
-      appendQuickChips(["سؤال جديد", "الشامبو", "العناية بالبشرة"], (choice) => {
-        if (choice === "سؤال جديد") {
+      appendQuickChips(["سؤال جديد", "الشامبو", "العطور"], (nextChoice) => {
+        if (nextChoice === "سؤال جديد") {
           startGuidedFlow();
         } else {
-          handleGuidedCategory(choice);
+          handleGuidedCategory(nextChoice);
         }
       });
       chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -1008,24 +948,34 @@
         return;
       }
       appendChatMessage(catName, "user");
+
+      // إذا كان قسماً مثل (العطور) يطلع الموجود مباشرة بدون أزرار إضافية
+      if (flow.directShow) {
+        showAssistantSelection({
+          requiredKeys: flow.requiredKeys,
+          emptyMessage: `ما متوفرة حالياً منتجات في قسم "${catName}".`
+        });
+        return;
+      }
+
+      // إذا كان (الشامبو) يسأل نوع الشعر ويختار المساعد الشامبو الأنسب له
       guidedState = { step: "sub", category: catName };
       appendChatMessage(flow.question, "bot");
-      const opts = flow.choices.map(c => c.label).concat(["كل خيارات القسم"]);
-      appendQuickChips(opts, (subLabel) => {
+      appendQuickChips(flow.choices.map(c => c.label), (subLabel) => {
         appendChatMessage(subLabel, "user");
-        const isShampoo = catName === "الشامبو";
-        if (subLabel === "كل خيارات القسم") {
-          renderMatchedProducts(flow.keywords, [], "", isShampoo);
-        } else {
-          const picked = flow.choices.find(c => c.label === subLabel);
-          renderMatchedProducts(flow.keywords, picked ? picked.keys : [], "", isShampoo);
-        }
+        const picked = flow.choices.find(c => c.label === subLabel);
+        showAssistantSelection({
+          requiredKeys: flow.requiredKeys,
+          traitKeys: picked ? picked.keys : [],
+          autoPickSingle: Boolean(flow.askHairType),
+          emptyMessage: "ما متوفر شامبو مطابق لهذا النوع حالياً."
+        });
       });
     }
 
     function startGuidedFlow() {
       guidedState = { step: "cat", category: null };
-      appendChatMessage("شنو تحتاجين هسه حتى أرشّح لج المنتج والخيار المناسب؟", "bot");
+      appendChatMessage("شنو تحتاجين هسه؟", "bot");
       appendQuickChips(Object.keys(guidedFlows), (cat) => handleGuidedCategory(cat));
     }
 
@@ -1106,15 +1056,33 @@
 
         if (guidedState.step === "sub" && guidedState.category && guidedFlows[guidedState.category]) {
           const flow = guidedFlows[guidedState.category];
-          renderMatchedProducts(flow.keywords, [message], message, guidedState.category === "الشامبو");
+          showAssistantSelection({
+            requiredKeys: flow.requiredKeys,
+            traitKeys: [message],
+            autoPickSingle: Boolean(flow.askHairType),
+            emptyMessage: "ما متوفر منتج مطابق لهذا الوصف حالياً."
+          });
+          return;
+        }
+
+        const nMsg = normalizeAr(message);
+        if (nMsg.includes("عطر") || nMsg.includes("عطور")) {
+          showAssistantSelection({
+            requiredKeys: guidedFlows["العطور"].requiredKeys,
+            emptyMessage: "ما متوفرة عطور حالياً في المتجر."
+          });
           return;
         }
 
         const localHits = getStoreProductsList().filter(p =>
-          normalizeAr(message).split(/\s+/).filter(w => w.length > 1).some(w => p.text.includes(w))
+          nMsg.split(/\s+/).filter(w => w.length > 1).some(w => p.text.includes(w))
         );
         if (localHits.length) {
-          renderMatchedProducts([], [], message, normalizeAr(message).includes("شامبو"));
+          showAssistantSelection({
+            freeQuery: message,
+            autoPickSingle: nMsg.includes("شامبو"),
+            emptyMessage: "ما متوفر منتج مطابق حالياً."
+          });
           return;
         }
 
@@ -1529,5 +1497,3 @@
 </body>
 </html>
 ```[cite: 2]
-
-إذا لاحظت أن خيارات منتج معين في `app.js` لا تُقرأ تلقائياً، أخبرني باسم الصنف (`class`) أو السمة (`attribute`) التي يستخدمها `app.js` لخيارات المنتج وسأضيفها مباشرة إلى `extractVariantsFromCard`.
