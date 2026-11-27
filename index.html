@@ -374,10 +374,16 @@
       border-radius: 12px;
       padding: 8px 10px;
       display: flex;
+      flex-direction: column;
+      gap: 7px;
+      box-shadow: 0 3px 10px rgba(214, 51, 108, 0.08);
+    }
+
+    .ld-ai-prod-top {
+      display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      box-shadow: 0 3px 10px rgba(214, 51, 108, 0.08);
     }
 
     .ld-ai-prod-info {
@@ -416,6 +422,31 @@
       font-weight: bold;
       cursor: pointer;
       flex-shrink: 0;
+    }
+
+    .ld-ai-var-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .ld-ai-var-chip {
+      background: #fdf2f8;
+      color: #831843;
+      border: 1px solid #f9a8d4;
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .ld-ai-var-chip.active,
+    .ld-ai-var-chip:hover {
+      background: #d6336c;
+      color: #ffffff;
+      border-color: #d6336c;
     }
 
     #ldorava-chat-form {
@@ -536,7 +567,7 @@
       <button id="ldorava-chat-close" type="button" aria-label="إغلاق">×</button>
     </div>
     <div id="ldorava-chat-messages">
-      <div class="ld-msg bot">أهلاً بك في L'DORA Viva! راح أسألج أسئلة سريعة وأطلع لج المنتجات المناسبة، أو اسأليني مباشرة.</div>
+      <div class="ld-msg bot">أهلاً بك في L'DORA Viva! راح أسألج أسئلة سريعة وأطلع لج المنتج والخيار المناسب، أو اسأليني مباشرة.</div>
     </div>
     <form id="ldorava-chat-form">
       <input id="ldorava-chat-input" type="text" placeholder="اكتب سؤالك هنا..." autocomplete="off" />
@@ -650,32 +681,34 @@
     let guidedState = { step: "start", category: null };
 
     const guidedFlows = {
-      "الشعر والشامبو": {
-        keywords: ["شامبو", "شعر", "بلسم", "ماسك", "كيراتين", "سيروم"],
-        question: "ممتاز! شنو نوع شعركِ أو المشكلة اللي تحبين تعالجيها؟",
+      "الشامبو": {
+        keywords: ["شامبو", "شعر", "بلسم", "ماسك", "كيراتين"],
+        question: "اختاري نوع الشعر أو المشكلة حتى أرشّح لج الشامبو والخيار المناسب:",
         choices: [
-          { label: "جاف وتالف", keys: ["جاف", "تالف", "ترطيب", "كيراتين", "ارغان", "أرغان"] },
-          { label: "دهني", keys: ["دهني", "توازن", "منقي", "نعناع", "ليمون"] },
-          { label: "تساقط وتقوية", keys: ["تساقط", "تقوية", "كافيين", "مقوي"] },
-          { label: "قشرة أو مصبوغ", keys: ["قشرة", "قشره", "مصبوغ", "ملون"] }
+          { label: "شعر جاف وتالف", keys: ["جاف", "جافه", "تالف", "ترطيب", "كيراتين", "ارغان", "أرغان"] },
+          { label: "شعر دهني", keys: ["دهني", "دهنيه", "توازن", "منقي", "نعناع", "ليمون"] },
+          { label: "تساقط وتقوية", keys: ["تساقط", "تقوية", "تقويه", "كافيين", "مقوي"] },
+          { label: "ضد القشرة", keys: ["قشرة", "قشره", "فروة", "فروه"] },
+          { label: "شعر مصبوغ", keys: ["مصبوغ", "مصبوغه", "ملون", "حماية اللون"] },
+          { label: "استخدام يومي / عادي", keys: ["عادي", "عائلي", "يومي", "ناعم", "لجميع"] }
         ]
       },
       "العناية بالبشرة": {
-        keywords: ["بشرة", "غسول", "كريم", "سيروم", "مرطب", "واقي", "تونر", "ماسك"],
-        question: "تمام، شنو أكثر شي تحتاجينه لبشرتكِ حالياً؟",
+        keywords: ["بشرة", "بشره", "غسول", "كريم", "سيروم", "مرطب", "واقي", "تونر"],
+        question: "شنو أكثر شي تحتاجينه لبشرتكِ حالياً؟",
         choices: [
-          { label: "ترطيب عميق", keys: ["ترطيب", "جافة", "مرطب", "هيالورونيك"] },
-          { label: "تفتيح ونضارة", keys: ["تفتيح", "نضارة", "فيتامين", "كولاجين"] },
-          { label: "بشرة دهنية / حبوب", keys: ["دهنية", "حبوب", "مسام", "غسول"] },
+          { label: "ترطيب عميق", keys: ["ترطيب", "جافة", "جافه", "مرطب", "هيالورونيك"] },
+          { label: "تفتيح ونضارة", keys: ["تفتيح", "نضارة", "نضاره", "فيتامين", "كولاجين"] },
+          { label: "بشرة دهنية / حبوب", keys: ["دهنية", "دهنيه", "حبوب", "مسام", "غسول"] },
           { label: "حماية من الشمس", keys: ["شمس", "واقي", "spf"] }
         ]
       },
       "المكياج": {
-        keywords: ["مكياج", "اساس", "أساس", "روج", "حمرة", "ماسكارا", "باودر", "كونسيلر"],
+        keywords: ["مكياج", "اساس", "أساس", "روج", "حمرة", "حمره", "ماسكارا", "باودر", "كونسيلر"],
         question: "أي نوع من المكياج تدورين عليه؟",
         choices: [
           { label: "أساس وتغطية", keys: ["اساس", "أساس", "باودر", "كونسيلر", "بي بي"] },
-          { label: "شفاه", keys: ["روج", "حمرة", "شفاه", "قلوس"] },
+          { label: "شفاه", keys: ["روج", "حمرة", "حمره", "شفاه", "قلوس"] },
           { label: "عيون", keys: ["ماسكارا", "كحل", "عيون", "رموش"] }
         ]
       },
@@ -697,6 +730,30 @@
       .replace(/ى/g, "ي")
       .trim();
 
+    function extractVariantsFromCard(card) {
+      if (!card) return [];
+      const rawEls = Array.from(card.querySelectorAll(
+        "[data-variant], [data-option], .variant, .var-item, .chip, .tag, option, button"
+      ));
+      const names = [];
+      rawEls.forEach(el => {
+        if (el.classList.contains("ld-ai-prod-btn") || el.classList.contains("ld-ai-var-chip")) return;
+        const txt = (
+          el.getAttribute("data-variant") ||
+          el.getAttribute("data-option") ||
+          el.getAttribute("aria-label") ||
+          el.textContent ||
+          ""
+        ).trim();
+        if (!txt) return;
+        if (/سلة|أضف|أضيفي|اطلب|تثبيت|إغلاق|مقارنة|قارن/i.test(txt)) return;
+        if (txt.length > 0 && txt.length <= 35 && !/^\d+$/.test(txt)) {
+          if (!names.includes(txt)) names.push(txt);
+        }
+      });
+      return names;
+    }
+
     function getStoreProductsList() {
       const raw = (Array.isArray(window.PRODUCTS) && window.PRODUCTS.length)
         ? window.PRODUCTS
@@ -707,15 +764,19 @@
       if (raw) {
         return raw.map((p, idx) => {
           const vars = Array.isArray(p.variants) ? p.variants : (Array.isArray(p.options) ? p.options : []);
-          const varNames = vars.map(v => typeof v === "string" ? v : (v.name || v.title || "")).filter(Boolean);
+          const varNames = vars
+            .map(v => typeof v === "string" ? v : (v.name || v.title || v.label || ""))
+            .filter(Boolean);
+          const cardEl = cards[idx] || null;
+          const mergedVars = varNames.length ? varNames : extractVariantsFromCard(cardEl);
           return {
             id: String(p.id ?? idx),
             name: p.name || p.title || `منتج ${idx + 1}`,
             price: p.price ? `${p.price} د.ع` : "",
             img: p.image || p.img || (Array.isArray(p.images) ? p.images[0] : ""),
-            variants: varNames,
-            text: normalizeAr(`${p.name || ""} ${p.category || ""} ${p.desc || ""} ${p.description || ""} ${varNames.join(" ")}`),
-            cardEl: cards[idx] || null
+            variants: mergedVars,
+            text: normalizeAr(`${p.name || ""} ${p.category || ""} ${p.desc || ""} ${p.description || ""} ${mergedVars.join(" ")}`),
+            cardEl
           };
         });
       }
@@ -726,12 +787,10 @@
         const lines = (card.innerText || "").split("\n").map(x => x.trim()).filter(Boolean);
         const name = (heading ? heading.textContent.trim() : "") || lines[0] || `منتج ${idx + 1}`;
         const price = lines.find(l => /\d/.test(l) && l !== name) || "";
-        const badges = Array.from(card.querySelectorAll(".variant, .chip, .tag, .badge"))
-          .map(el => el.textContent.trim())
-          .filter(t => t && t.length < 25 && !/^\d+$/.test(t));
+        const badges = extractVariantsFromCard(card);
 
         return {
-          id: card.getAttribute("data-id") || `item-${idx}`,
+          id: card.getAttribute("data-id") || card.getAttribute("data-product-id") || `item-${idx}`,
           name,
           price,
           img: imgEl ? (imgEl.getAttribute("src") || "") : "",
@@ -760,7 +819,66 @@
       chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
-    function renderMatchedProducts(catKeys, subKeys, freeQuery) {
+    function selectVariantInsideModal(modal, variantKeyword) {
+      if (!modal || !variantKeyword) return false;
+      const targetKey = normalizeAr(variantKeyword);
+      const candidates = Array.from(modal.querySelectorAll(
+        "button, .variant, .var-item, .opt, label, [data-variant], [data-option], [data-value]"
+      ));
+
+      const exactOrPartial = candidates.find(el => {
+        const rawVal = (
+          el.getAttribute("data-variant") ||
+          el.getAttribute("data-option") ||
+          el.getAttribute("data-value") ||
+          el.textContent ||
+          ""
+        ).trim();
+        const normVal = normalizeAr(rawVal);
+        if (!normVal) return false;
+        if (/سلة|أضف|أضيفي|اطلب|إغلاق|×/i.test(rawVal)) return false;
+        return normVal.includes(targetKey) || targetKey.includes(normVal);
+      });
+
+      if (exactOrPartial) {
+        exactOrPartial.click();
+        exactOrPartial.dispatchEvent(new Event("change", { bubbles: true }));
+        return true;
+      }
+
+      const selectEl = modal.querySelector("select");
+      if (selectEl) {
+        const opt = Array.from(selectEl.options).find(o => {
+          const nOpt = normalizeAr(o.textContent || o.value);
+          return nOpt && (nOpt.includes(targetKey) || targetKey.includes(nOpt));
+        });
+        if (opt) {
+          selectEl.value = opt.value;
+          selectEl.dispatchEvent(new Event("input", { bubbles: true }));
+          selectEl.dispatchEvent(new Event("change", { bubbles: true }));
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function openProductWithSelectedVariant(prod, chosenVariant) {
+      chatBox.style.display = "none";
+      syncAssistantVisibility();
+
+      if (prod.cardEl) {
+        prod.cardEl.click();
+        if (chosenVariant) {
+          setTimeout(() => selectVariantInsideModal(document.getElementById("pmodal"), chosenVariant), 120);
+          setTimeout(() => selectVariantInsideModal(document.getElementById("pmodal"), chosenVariant), 320);
+          setTimeout(() => selectVariantInsideModal(document.getElementById("pmodal"), chosenVariant), 600);
+        }
+      } else {
+        addProductIdToStoreCart(prod.id, "", chosenVariant || "");
+      }
+    }
+
+    function renderMatchedProducts(catKeys, subKeys, freeQuery, isShampooFlow = false) {
       const all = getStoreProductsList();
       const nCat = (catKeys || []).map(normalizeAr);
       const nSub = (subKeys || []).map(normalizeAr);
@@ -770,66 +888,114 @@
         let score = 0;
         let matchedVariant = "";
 
-        nCat.forEach(k => { if (prod.text.includes(k)) score += 2; });
+        const hasCatMatch = nCat.some(k => prod.text.includes(k));
+        if (hasCatMatch) score += 3;
+
+        if (isShampooFlow && !hasCatMatch && nCat.length) {
+          score -= 5;
+        }
+
         nSub.forEach(k => {
-          if (prod.text.includes(k)) score += 3;
-          const vHit = prod.variants.find(v => normalizeAr(v).includes(k));
-          if (vHit && !matchedVariant) matchedVariant = vHit;
+          if (prod.text.includes(k)) score += 4;
+          const vHit = prod.variants.find(v => {
+            const nv = normalizeAr(v);
+            return nv.includes(k) || k.includes(nv);
+          });
+          if (vHit && !matchedVariant) {
+            matchedVariant = vHit;
+            score += 4;
+          }
         });
+
+        if (!matchedVariant && prod.variants.length) {
+          matchedVariant = prod.variants[0];
+        }
+
         if (nQuery) {
           nQuery.split(/\s+/).filter(w => w.length > 1).forEach(word => {
             if (prod.text.includes(word)) score += 3;
+            const vWordHit = prod.variants.find(v => normalizeAr(v).includes(word));
+            if (vWordHit && !matchedVariant) {
+              matchedVariant = vWordHit;
+              score += 3;
+            }
           });
         }
+
         return { prod, score, matchedVariant };
       }).filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 3);
 
-      if (!scored.length && !nQuery) {
-        scored = all.slice(0, 3).map(prod => ({ prod, score: 0, matchedVariant: "" }));
+      if (!scored.length && !nQuery && !isShampooFlow) {
+        scored = all.slice(0, 3).map(prod => ({
+          prod,
+          score: 0,
+          matchedVariant: prod.variants[0] || ""
+        }));
       }
 
       if (scored.length) {
-        appendChatMessage("هاي المنتجات الأنسب لاختياركِ:", "bot");
+        appendChatMessage(
+          isShampooFlow ? "هذا الشامبو الأنسب لاختياركِ:" : "هاي المنتجات الأنسب لاختياركِ:",
+          "bot"
+        );
+
         scored.forEach(({ prod, matchedVariant }) => {
+          let activeVariant = matchedVariant || (prod.variants[0] || "");
           const card = document.createElement("div");
           card.className = "ld-ai-prod-card";
+
+          const variantsHtml = prod.variants.length
+            ? `<div class="ld-ai-var-list">
+                ${prod.variants.map(v => `
+                  <button type="button" class="ld-ai-var-chip ${v === activeVariant ? "active" : ""}" data-vname="${v.replace(/"/g, "&quot;")}">${v}</button>
+                `).join("")}
+              </div>`
+            : "";
+
           card.innerHTML = `
-            ${prod.img ? `<img src="${prod.img}" alt="" style="width:42px;height:42px;object-fit:cover;border-radius:8px;flex-shrink:0;">` : ""}
-            <div class="ld-ai-prod-info">
-              <div class="ld-ai-prod-title">${prod.name}</div>
-              ${matchedVariant ? `<div class="ld-ai-prod-sub">النوع المناسب: ${matchedVariant}</div>` : ""}
-              ${prod.price ? `<div class="ld-ai-prod-price">${prod.price}</div>` : ""}
+            <div class="ld-ai-prod-top">
+              ${prod.img ? `<img src="${prod.img}" alt="" style="width:42px;height:42px;object-fit:cover;border-radius:8px;flex-shrink:0;">` : ""}
+              <div class="ld-ai-prod-info">
+                <div class="ld-ai-prod-title">${prod.name}</div>
+                <div class="ld-ai-prod-sub">${activeVariant ? `الخيار المختار: ${activeVariant}` : "اخترِ المنتج"}</div>
+                ${prod.price ? `<div class="ld-ai-prod-price">${prod.price}</div>` : ""}
+              </div>
+              <button type="button" class="ld-ai-prod-btn">اختيار</button>
             </div>
-            <button type="button" class="ld-ai-prod-btn">اختيار</button>
+            ${variantsHtml}
           `;
-          card.querySelector(".ld-ai-prod-btn").addEventListener("click", () => {
-            chatBox.style.display = "none";
-            syncAssistantVisibility();
-            if (prod.cardEl) {
-              prod.cardEl.click();
-              if (matchedVariant) {
-                setTimeout(() => {
-                  const modal = document.getElementById("pmodal");
-                  if (!modal) return;
-                  const target = Array.from(modal.querySelectorAll("button, .variant, .opt, label"))
-                    .find(el => normalizeAr(el.textContent).includes(normalizeAr(matchedVariant)));
-                  if (target) target.click();
-                }, 120);
+
+          const subLabelEl = card.querySelector(".ld-ai-prod-sub");
+          card.querySelectorAll(".ld-ai-var-chip").forEach(vBtn => {
+            vBtn.addEventListener("click", () => {
+              card.querySelectorAll(".ld-ai-var-chip").forEach(b => b.classList.remove("active"));
+              vBtn.classList.add("active");
+              activeVariant = vBtn.getAttribute("data-vname") || "";
+              if (subLabelEl && activeVariant) {
+                subLabelEl.textContent = `الخيار المختار: ${activeVariant}`;
               }
-            } else {
-              addProductIdToStoreCart(prod.id, "", matchedVariant);
-            }
+            });
           });
+
+          card.querySelector(".ld-ai-prod-btn").addEventListener("click", () => {
+            openProductWithSelectedVariant(prod, activeVariant || (nSub[0] || ""));
+          });
+
           chatMessages.appendChild(card);
         });
+      } else {
+        appendChatMessage(
+          "ما لقيت مطابقة مباشرة لهذا الاختيار حالياً، جربي خياراً آخر أو اكتبي اسم المنتج المطلوب.",
+          "bot"
+        );
       }
 
       guidedState = { step: "start", category: null };
-      appendQuickChips(["سؤال جديد", "شامبو للشعر", "عناية بالبشرة"], (choice) => {
+      appendQuickChips(["سؤال جديد", "الشامبو", "العناية بالبشرة"], (choice) => {
         if (choice === "سؤال جديد") {
           startGuidedFlow();
         } else {
-          handleGuidedCategory(choice === "شامبو للشعر" ? "الشعر والشامبو" : "العناية بالبشرة");
+          handleGuidedCategory(choice);
         }
       });
       chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -844,21 +1010,22 @@
       appendChatMessage(catName, "user");
       guidedState = { step: "sub", category: catName };
       appendChatMessage(flow.question, "bot");
-      const opts = flow.choices.map(c => c.label).concat(["كل منتجات القسم"]);
+      const opts = flow.choices.map(c => c.label).concat(["كل خيارات القسم"]);
       appendQuickChips(opts, (subLabel) => {
         appendChatMessage(subLabel, "user");
-        if (subLabel === "كل منتجات القسم") {
-          renderMatchedProducts(flow.keywords, [], "");
+        const isShampoo = catName === "الشامبو";
+        if (subLabel === "كل خيارات القسم") {
+          renderMatchedProducts(flow.keywords, [], "", isShampoo);
         } else {
           const picked = flow.choices.find(c => c.label === subLabel);
-          renderMatchedProducts(flow.keywords, picked ? picked.keys : [], "");
+          renderMatchedProducts(flow.keywords, picked ? picked.keys : [], "", isShampoo);
         }
       });
     }
 
     function startGuidedFlow() {
       guidedState = { step: "cat", category: null };
-      appendChatMessage("شنو تحتاجين هسه حتى أرشّح لج الأنسب؟", "bot");
+      appendChatMessage("شنو تحتاجين هسه حتى أرشّح لج المنتج والخيار المناسب؟", "bot");
       appendQuickChips(Object.keys(guidedFlows), (cat) => handleGuidedCategory(cat));
     }
 
@@ -939,7 +1106,7 @@
 
         if (guidedState.step === "sub" && guidedState.category && guidedFlows[guidedState.category]) {
           const flow = guidedFlows[guidedState.category];
-          renderMatchedProducts(flow.keywords, [message], message);
+          renderMatchedProducts(flow.keywords, [message], message, guidedState.category === "الشامبو");
           return;
         }
 
@@ -947,7 +1114,7 @@
           normalizeAr(message).split(/\s+/).filter(w => w.length > 1).some(w => p.text.includes(w))
         );
         if (localHits.length) {
-          renderMatchedProducts([], [], message);
+          renderMatchedProducts([], [], message, normalizeAr(message).includes("شامبو"));
           return;
         }
 
@@ -1362,3 +1529,5 @@
 </body>
 </html>
 ```[cite: 2]
+
+إذا لاحظت أن خيارات منتج معين في `app.js` لا تُقرأ تلقائياً، أخبرني باسم الصنف (`class`) أو السمة (`attribute`) التي يستخدمها `app.js` لخيارات المنتج وسأضيفها مباشرة إلى `extractVariantsFromCard`.
