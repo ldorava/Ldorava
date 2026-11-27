@@ -545,7 +545,7 @@
   </div>
 
   <script src="app.js"></script>
-  <script>
+<script>
     let deferredPrompt;
     const installBtn = document.getElementById('installAppBtn');
     const iosOv = document.getElementById('iosInstallOv');
@@ -654,11 +654,12 @@
       "الشامبو": {
         directShow: false,
         askHairType: true,
-        requiredKeys: ["شامبو", "شعر", "بلسم", "ماسك", "كيراتين"],
+        requiredKeys: ["شامبو", "شامبوهات", "شعر", "بلسم", "ماسك", "كيراتين"],
+        excludeKeys: ["تونر", "الوجه", "للبشره", "بشره", "غسول وجه", "كريم وجه", "مكياج", "روج", "عطر"],
         question: "شنو نوع شعرج أو المشكلة حتى أختار لج الشامبو والنوع المناسب؟",
         choices: [
           { label: "شعر جاف وتالف", keys: ["جاف", "جافه", "تالف", "ترطيب", "كيراتين", "ارغان", "أرغان"] },
-          { label: "شعر دهني", keys: ["دهني", "دهنيه", "توازن", "منقي", "نعناع", "ليمون"] },
+          { label: "شعر دهني", keys: ["دهني", "دهنيه", "توازن", "منقي", "نعناع", "ليمون", "شامبو"] },
           { label: "تساقط وتقوية", keys: ["تساقط", "تقوية", "تقويه", "كافيين", "مقوي"] },
           { label: "ضد القشرة", keys: ["قشرة", "قشره", "فروة", "فروه"] },
           { label: "شعر مصبوغ", keys: ["مصبوغ", "مصبوغه", "ملون", "حماية اللون"] }
@@ -668,24 +669,27 @@
         directShow: true,
         askHairType: false,
         requiredKeys: ["عطر", "عطور", "برفيوم", "سبلاش", "معطر", "فواح", "او دي"],
+        excludeKeys: ["تونر", "شامبو", "ماسكارا", "روج"],
         question: "",
         choices: []
       },
       "العناية بالبشرة": {
         directShow: false,
         askHairType: false,
-        requiredKeys: ["بشرة", "بشره", "غسول", "كريم", "سيروم", "مرطب", "واقي", "تونر"],
+        requiredKeys: ["بشره", "غسول", "كريم", "سيروم", "مرطب", "واقي", "تونر", "الوجه"],
+        excludeKeys: ["شامبو", "شعر", "روج", "ماسكارا"],
         question: "شنو أكثر شي تحتاجينه لبشرتج حالياً؟",
         choices: [
-          { label: "ترطيب عميق", keys: ["ترطيب", "جافة", "جافه", "مرطب", "هيالورونيك"] },
-          { label: "تفتيح ونضارة", keys: ["تفتيح", "نضارة", "نضاره", "فيتامين", "كولاجين"] },
-          { label: "بشرة دهنية / حبوب", keys: ["دهنية", "دهنيه", "حبوب", "مسام", "غسول"] }
+          { label: "ترطيب عميق", keys: ["ترطيب", "جافه", "مرطب", "هيالورونيك", "تونر"] },
+          { label: "تفتيح ونضارة", keys: ["تفتيح", "نضاره", "فيتامين", "كولاجين", "رمان"] },
+          { label: "بشرة دهنية / حبوب", keys: ["دهنيه", "حبوب", "مسام", "غسول"] }
         ]
       },
       "المكياج": {
         directShow: true,
         askHairType: false,
-        requiredKeys: ["مكياج", "اساس", "أساس", "روج", "حمرة", "حمره", "ماسكارا", "باودر", "كونسيلر"],
+        requiredKeys: ["مكياج", "اساس", "روج", "حمره", "ماسكارا", "باودر", "كونسيلر"],
+        excludeKeys: ["شامبو", "تونر", "عطر"],
         question: "",
         choices: []
       }
@@ -780,6 +784,7 @@
           price: price || matchedStore?.price || "",
           img: imgEl ? (imgEl.getAttribute("src") || "") : (matchedStore?.img || ""),
           variants: finalVariants,
+          nameNorm: normalizeAr(name),
           text: normalizeAr(`${name} ${lines.join(" ")} ${finalVariants.join(" ")} ${extraInfo}`),
           cardEl: card
         };
@@ -794,6 +799,7 @@
           price: sp.price,
           img: sp.img,
           variants: sp.variants,
+          nameNorm: normalizeAr(sp.name),
           text: normalizeAr(`${sp.name} ${sp.extraText}`),
           cardEl: null
         }));
@@ -907,6 +913,7 @@
     function showAssistantSelection(opts) {
       const {
         requiredKeys = [],
+        excludeKeys = [],
         traitKeys = [],
         freeQuery = "",
         autoPickSingle = false,
@@ -915,14 +922,22 @@
 
       const all = getStoreProductsList();
       const nReq = requiredKeys.map(normalizeAr);
+      const nExcl = excludeKeys.map(normalizeAr);
       const nTrait = traitKeys.map(normalizeAr);
       const nQuery = normalizeAr(freeQuery);
 
       let matches = all.map(prod => {
+        // يجب أن يحتوي المنتج على كلمة أساسية من القسم المطلوب (مثلاً شامبو/شعر)
         const reqMatched = !nReq.length || nReq.some(k => prod.text.includes(k));
         if (!reqMatched) return null;
 
+        // استبعاد المنتجات التي اسمها أو وصفها يطابق كلمات مستبعدة بوضوح (مثل تونر الوجه لمسار الشامبو)
+        const isExcludedByName = nExcl.some(ex => prod.nameNorm.includes(ex));
+        if (isExcludedByName) return null;
+
         let score = 1;
+        if (nReq.some(k => prod.nameNorm.includes(k))) score += 10;
+
         nTrait.forEach(k => {
           if (prod.text.includes(k)) score += 6;
         });
@@ -999,6 +1014,7 @@
       if (flow.directShow) {
         showAssistantSelection({
           requiredKeys: flow.requiredKeys,
+          excludeKeys: flow.excludeKeys || [],
           emptyMessage: `ما متوفرة حالياً منتجات في قسم "${catName}".`
         });
         return;
@@ -1011,6 +1027,7 @@
         const picked = flow.choices.find(c => c.label === subLabel);
         showAssistantSelection({
           requiredKeys: flow.requiredKeys,
+          excludeKeys: flow.excludeKeys || [],
           traitKeys: picked ? picked.keys : [],
           autoPickSingle: Boolean(flow.askHairType),
           emptyMessage: "ما متوفر شامبو مطابق لهذا النوع حالياً."
@@ -1103,6 +1120,7 @@
           const flow = guidedFlows[guidedState.category];
           showAssistantSelection({
             requiredKeys: flow.requiredKeys,
+            excludeKeys: flow.excludeKeys || [],
             traitKeys: [message],
             autoPickSingle: Boolean(flow.askHairType),
             emptyMessage: "ما متوفر منتج مطابق لهذا الوصف حالياً."
@@ -1114,6 +1132,7 @@
         if (nMsg.includes("عطر") || nMsg.includes("عطور")) {
           showAssistantSelection({
             requiredKeys: guidedFlows["العطور"].requiredKeys,
+            excludeKeys: guidedFlows["العطور"].excludeKeys,
             emptyMessage: "ما متوفرة عطور حالياً في المتجر."
           });
           return;
